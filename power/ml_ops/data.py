@@ -1,13 +1,21 @@
 import numpy as np
 import pandas as pd
 import datetime as dt
+import os
 
 
 def get_pv_data() -> pd.DataFrame:
     """
     Load raw data from local directory
     """
-    df = pd.read_csv('../raw_data/1980-2022_pv.csv')
+    absolute_path = os.path.dirname(
+                        os.path.dirname(
+                            os.path.dirname( __file__ )))
+    relative_path = 'raw_data/'
+    csv_path = os.path.join(absolute_path, relative_path)
+
+    df = pd.read_csv(csv_path + '1980-2022_pv.csv')
+
     print('# data loaded')
     return df
 
