@@ -39,7 +39,7 @@ location = locations.radio("Locations", ["Berlin - Tempelhof", "Berlin - Tegel",
 url = 'our-api-url_local'
 params= {'requests':'params'}
 
-repsonse = requests.get(url)
+#response = requests.get(url)
 
 
 # Main Panel
