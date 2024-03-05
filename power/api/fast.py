@@ -1,6 +1,8 @@
 import pandas as pd
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from power.ml_ops.data import get_pv_data, clean_pv_data
+from power.ml_ops.model import model_yesterday
 from datetime import datetime, timedelta
 
 app = FastAPI()
@@ -35,6 +37,13 @@ def predict(
 
     return converted_dict
 
+@app.get("/predict/previous_value")
+def predict_previous_value(input_date: str):
+    pv_data = get_pv_data()
+    pv_data_clean = clean_pv_data(pv_data)
+    yesterday_baseline = model_yesterday(pv_data_clean, input_date)
+    values = yesterday_baseline.get('electricity').to_list()
+    return {input_date: values}
 
 
 @app.get("/")
