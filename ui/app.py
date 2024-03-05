@@ -27,7 +27,7 @@ st.sidebar.markdown(f"""
     """)
 
 prediction_date = st.sidebar.date_input('Power prediction date')
-predicition_time = st.sidebar.date_input('Power prediction time')
+predicition_time = st.sidebar.time_input('Power prediction time',value=None, step=3600)
 locations = st.sidebar.expander("Available locations")
 days_to_display = st.sidebar.slider('Select the number of past data to display', 1, 10, 5)
 
