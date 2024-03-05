@@ -1,7 +1,0 @@
-Metadata-Version: 2.1
-Name: advanced-power-forecast
-Version: 0.0.1
-Summary: Team project
-Requires-Dist: streamlit
-Requires-Dist: folium
-Requires-Dist: streamlit-folium
