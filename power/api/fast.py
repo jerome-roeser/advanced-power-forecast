@@ -48,6 +48,16 @@ def predict_previous_value(input_date: str):
     return {input_date: values}
 
 
+@app.get("/extract_df")
+def predict_previous_value(input_date: str, n_days=10):
+    pv_data_clean = app.state.data_pv_clean
+    input_timestamp = pd.Timestamp(input_date, tz='UTC')
+    idx = pv_data_clean[pv_data_clean.utc_time == input_timestamp].index[0]
+    if idx <= 24:
+        return X.iloc[0:idx,:]
+    return X.iloc[idx-24:idx,:]
+
+
 @app.get("/")
 def root():
 

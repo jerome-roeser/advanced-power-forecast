@@ -85,11 +85,21 @@ folium_static(map)
 file = "raw_data/1980-2022_pv.csv"
 pv = pd.read_csv(file)
 
+# set-up thhe indices
 hours_to_display = 24 * days_to_display
+input_timestamp = pd.Timestamp(input_prediction_date, tz='UTC')
+idx = pv[pv.utc_time == input_timestamp].index[0]
+
+# set-up 3 DatFrames according to input date and type of model
+X = pv.iloc[idx-hours_to_display:idx,:].set_index(np.arange(hours_to_display))
+y = pv.iloc[idx:idx+24,:].set_index(np.arange(hours_to_display,hours_to_display+24))
+y_model = baseline_df.set_index(np.arange(hours_to_display,hours_to_display+24))
+
 
 fig, ax = plt.subplots()
-ax.plot(pv.electricity[240-hours_to_display:240], label='Past data')
-ax.plot(pv.electricity[240:265], label='Predicted data')
+ax.plot(X.get('electricity'), label='historical data')
+ax.plot(y.get('electricity'), label='predicted data')
+ax.plot(y_model.get(input_prediction_date), label='baseline data_API')
 ax.legend()
 plt.xlim(0,265)
 st.pyplot(fig)
@@ -97,8 +107,8 @@ st.pyplot(fig)
 
 
 # Metrics
-mean_training = pv.electricity[240-hours_to_display:240].mean()
-mean_predicted = pv.electricity[240:265].mean()
+mean_training = X.get('electricity').mean()
+mean_predicted = y_model.get(input_prediction_date).mean()
 mean_diff = mean_predicted - mean_training
 
 # Trick to use 4 columns to display the metrics centered below graph
