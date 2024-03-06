@@ -25,20 +25,20 @@ def clean_pv_data(pv_df: pd.DataFrame) ->pd.DataFrame:
     Remove unnecessary columns and convert to right dtypes
     """
     # remove unnevessary columns
-    pv_df.drop(columns=['irradiance_direct','irradiance_diffuse','temperature',
-                    'source','Unnamed: 0.1'], inplace=True)
+    df = pv_df.drop(columns=['irradiance_direct','irradiance_diffuse','temperature',
+                    'source','Unnamed: 0.1'])
 
     # convert dtypes
-    pv_df.electricity = pv_df.electricity.astype(float)
+    df.electricity = df.electricity.astype(float)
 
-    pv_df.local_time    = pv_df.local_time.apply(lambda x:
+    df.local_time = df.local_time.apply(lambda x:
                                             dt.datetime.strptime(x,
                                             "%Y-%m-%d %H:%M:%S%z")) # pd.to_datetime gives warning
 
-    pv_df['Unnamed: 0'] = pd.to_datetime(pv_df['Unnamed: 0'],
+    df['Unnamed: 0'] = pd.to_datetime(df['Unnamed: 0'],
                                          unit='ms').dt.tz_localize('UTC')
     # correct column names
-    pv_df.rename(columns={'Unnamed: 0': 'utc_time'}, inplace=True)
+    df.rename(columns={'Unnamed: 0': 'utc_time'}, inplace=True)
 
     print('# data cleaned')
-    return pv_df
+    return df
