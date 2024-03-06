@@ -30,7 +30,7 @@ predicition_time = st.sidebar.time_input(
                             value=datetime.time(0, 00),
                             step=3600)
 input_prediction_date = f"{prediction_date} {predicition_time}"
-st.sidebar.write(input_prediction_date)
+# st.sidebar.write(input_prediction_date)
 
 
 locations = st.sidebar.expander("Available locations")
@@ -43,18 +43,21 @@ location = locations.radio("Locations", ["Berlin - Tempelhof", "Berlin - Tegel",
 
 
 # make api call
-url = 'our-api-url_local'
-params= {'requests':'params'}
 base_url = "http://127.0.0.1:8000"
-endpoint = "/predict/previous_value"
-url_= f"{base_url}{endpoint}"
+endpoint_model = "/predict/previous_value"
+endpoint_data = "/extract_data"
+url_model = f"{base_url}{endpoint_model}"
+url_data = f"{base_url}{endpoint_data}"
 
 params ={
     'input_date':input_prediction_date
     }
 
-response = requests.get(url_, params=params).json()
-baseline_df = pd.DataFrame(response)
+response_model = requests.get(url_model, params=params).json()
+model_df = pd.DataFrame(response_model)
+
+response_data = requests.get(url_data, params=params).json()
+data_df = pd.DataFrame(response_data)
 
 
 
@@ -82,28 +85,22 @@ folium_static(map)
 
 
 # Graph for PV data
-file = "raw_data/1980-2022_pv.csv"
-pv = pd.read_csv(file)
-
-# set-up thhe indices
 hours_to_display = 24 * days_to_display
-input_timestamp = pd.Timestamp(input_prediction_date, tz='UTC')
-idx = pv[pv.utc_time == input_timestamp].index[0]
 
 # set-up 3 DatFrames according to input date and type of model
-X = pv.iloc[idx-hours_to_display:idx,:].set_index(np.arange(hours_to_display))
-y = pv.iloc[idx:idx+24,:].set_index(np.arange(hours_to_display,hours_to_display+24))
-y_model = baseline_df.set_index(np.arange(hours_to_display,hours_to_display+24))
+X = data_df.iloc[240-hours_to_display:-24,:]
+y = data_df.iloc[-24:,:]
+y_model = model_df.set_index(np.arange(240,240+24))
 
 
 fig, ax = plt.subplots()
-ax.plot(X.get('electricity'), label='historical data')
-ax.plot(y.get('electricity'), label='predicted data')
+ax.plot(X.get('electricity'), label='current production data')
+ax.plot(y.get('electricity'), label='true data')
 ax.plot(y_model.get(input_prediction_date), label='baseline data_API')
 ax.legend()
+plt.ylim(0,1)
 plt.xlim(0,265)
 st.pyplot(fig)
-
 
 
 # Metrics
