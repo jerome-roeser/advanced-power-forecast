@@ -19,13 +19,24 @@ st.sidebar.markdown(f"""
     # User Input
     """)
 
-prediction_date = st.sidebar.date_input('Power prediction date')
-predicition_time = st.sidebar.time_input('Power prediction time',value=None, step=3600)
+prediction_date = st.sidebar.date_input(
+                            label='Power prediction date',
+                            value=datetime.date(2020, 1, 1),
+                            min_value=datetime.date(1980, 1, 10),
+                            max_value=datetime.date(2020, 1, 1),
+                            )
+predicition_time = st.sidebar.time_input(
+                            label='Power prediction time',
+                            value=datetime.time(0, 00),
+                            step=3600)
+input_prediction_date = f"{prediction_date} {predicition_time}"
+st.sidebar.write(input_prediction_date)
+
+
 locations = st.sidebar.expander("Available locations")
 days_to_display = st.sidebar.slider('Select the number of past data to display', 1, 10, 5)
 
 input_prediction_date = f"{prediction_date} {predicition_time}"
-st.write(input_prediction_date)
 
 
 location = locations.radio("Locations", ["Berlin - Tempelhof", "Berlin - Tegel", "Berlin - Schönefeld"])
@@ -43,7 +54,7 @@ params ={
     }
 
 response = requests.get(url_, params=params).json()
-baseline_data = response.get(input_prediction_date)
+baseline_df = pd.DataFrame(response)
 
 
 
