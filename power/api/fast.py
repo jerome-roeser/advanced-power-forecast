@@ -6,6 +6,8 @@ from power.ml_ops.model import model_yesterday
 from datetime import datetime, timedelta
 
 app = FastAPI()
+app.state.data_pv = get_pv_data()
+app.state.data_pv_clean = clean_pv_data(app.state.data_pv)
 
 # Allowing all middleware is optional, but good practice for dev purposes
 app.add_middleware(
@@ -39,8 +41,8 @@ def predict(
 
 @app.get("/predict/previous_value")
 def predict_previous_value(input_date: str):
-    pv_data = get_pv_data()
-    pv_data_clean = clean_pv_data(pv_data)
+    # pv_data = get_pv_data()
+    pv_data_clean = app.state.data_pv_clean
     yesterday_baseline = model_yesterday(pv_data_clean, input_date)
     values = yesterday_baseline.get('electricity').to_list()
     return {input_date: values}

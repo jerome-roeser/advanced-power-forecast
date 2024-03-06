@@ -24,6 +24,9 @@ predicition_time = st.sidebar.time_input('Power prediction time',value=None, ste
 locations = st.sidebar.expander("Available locations")
 days_to_display = st.sidebar.slider('Select the number of past data to display', 1, 10, 5)
 
+input_prediction_date = f"{prediction_date} {predicition_time}"
+st.write(input_prediction_date)
+
 
 location = locations.radio("Locations", ["Berlin - Tempelhof", "Berlin - Tegel", "Berlin - Schönefeld"])
 
@@ -31,8 +34,17 @@ location = locations.radio("Locations", ["Berlin - Tempelhof", "Berlin - Tegel",
 # make api call
 url = 'our-api-url_local'
 params= {'requests':'params'}
+base_url = "http://127.0.0.1:8000"
+endpoint = "/predict/previous_value"
+url_= f"{base_url}{endpoint}"
 
-#response = requests.get(url)
+params ={
+    'input_date':input_prediction_date
+    }
+
+response = requests.get(url_, params=params).json()
+baseline_data = response.get(input_prediction_date)
+
 
 
 # Main Panel
