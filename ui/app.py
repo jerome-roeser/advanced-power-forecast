@@ -8,13 +8,6 @@ import numpy as np
 import pandas as pd
 import streamlit as st
 
-# pip install streamlit
-# pip install folium
-# pip install streamlit-folium
-# Darts package? with other models - indfleuence of other paramters (lecture TS)
-
-#@streamlit:
-#  streamlit run ui/app.py
 
 '''
 # Advanced Power Prediction
