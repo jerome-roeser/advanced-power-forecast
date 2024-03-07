@@ -42,3 +42,24 @@ def clean_pv_data(pv_df: pd.DataFrame) ->pd.DataFrame:
 
     print('# data cleaned')
     return df
+
+
+def select_years(df: pd.DataFrame, start=1980, end=1980)-> pd.DataFrame:
+    """
+    Select a subset of the cleaned data to process it further. Use this function
+    to split into test set and train+validation set.
+    Input:
+      - cleaned dataframe from the raw data
+      - start year (inclusive)
+      - end year (inclusive)
+    Output:
+      - df between start and end year
+    """
+    start_point = f"{start}-01-01 00:00:00"
+    end_point   = f"{end}-12-31 23:00:00"
+    years_df = df[df.utc_time.between(start_point, end_point)]
+
+    n_years = years_df['utc_time'].dt.year.nunique()
+    print(f"# selected {n_years} years from {start} to {end}")
+
+    return years_df
