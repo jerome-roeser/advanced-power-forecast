@@ -38,7 +38,7 @@ def init_baseline_yesterday():
     model.add(layers.Lambda(lambda x: x[:,-25:-1,0,None]))  # all sequences, last day, 1 feature (pv_power)
 
     ## Compile
-    adam = optimizers.Adam(learning_rate=0.02)
+    adam = optimizers.Adam()
     model.compile(loss='mse', optimizer=adam, metrics=["mae"])
 
     return model

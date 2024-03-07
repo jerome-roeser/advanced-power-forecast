@@ -63,3 +63,14 @@ def select_years(df: pd.DataFrame, start=1980, end=1980)-> pd.DataFrame:
     print(f"# selected {n_years} years from {start} to {end}")
 
     return years_df
+
+
+def load_data_to_bq(
+        data: pd.DataFrame,
+        gcp_project:str,
+        bq_dataset:str,
+        table: str,
+        truncate: bool
+    ) -> None:
+
+  pass
