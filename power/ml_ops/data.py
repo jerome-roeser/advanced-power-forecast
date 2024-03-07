@@ -26,7 +26,7 @@ def clean_pv_data(pv_df: pd.DataFrame) ->pd.DataFrame:
     """
     # remove unnevessary columns
     df = pv_df.drop(columns=['irradiance_direct','irradiance_diffuse','temperature',
-                    'source','Unnamed: 0.1'])
+                    'source','_0-1'])
 
     # convert dtypes
     df.electricity = df.electricity.astype(float)
@@ -35,10 +35,10 @@ def clean_pv_data(pv_df: pd.DataFrame) ->pd.DataFrame:
                                             dt.datetime.strptime(x,
                                             "%Y-%m-%d %H:%M:%S%z")) # pd.to_datetime gives warning
 
-    df['Unnamed: 0'] = pd.to_datetime(df['Unnamed: 0'],
+    df['_0'] = pd.to_datetime(df['_0'],
                                          unit='ms').dt.tz_localize('UTC')
     # correct column names
-    df.rename(columns={'Unnamed: 0': 'utc_time'}, inplace=True)
+    df.rename(columns={'_0': 'utc_time'}, inplace=True)
 
     print('# data cleaned')
     return df
