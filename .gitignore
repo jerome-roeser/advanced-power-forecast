@@ -1,4 +1,6 @@
 raw_data/
+power/__pycache__/
+power/ml_ops/__pycache__/
 
 
 # OS generated files #
