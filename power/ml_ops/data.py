@@ -38,7 +38,7 @@ def clean_pv_data(pv_df: pd.DataFrame) ->pd.DataFrame:
     print('# data cleaned')
     return df
 
-  
+
 def get_data_with_cache(
         gcp_project:str,
         query:str,
@@ -113,7 +113,7 @@ def get_pv_data() -> pd.DataFrame:
 
     print('# data loaded')
     return df
-  
+
 
 def select_years(df: pd.DataFrame, start=1980, end=1980)-> pd.DataFrame:
     """
