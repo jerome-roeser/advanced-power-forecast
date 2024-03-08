@@ -25,7 +25,7 @@ def preprocess(min_date:str = '2009-01-01', max_date:str = '2015-01-01') -> None
     # Query raw data from BUCKET BigQuery using `get_data_with_cache`
     query = f"""
         SELECT *
-        FROM {GCP_PROJECT_JEROME}.{BQ_DATASET}.raw_pv
+        FROM {GCP_PROJECT}.{BQ_DATASET}.raw_pv
         ORDER BY _0
     """
 
@@ -149,7 +149,7 @@ def evaluate(
     # Query your BigQuery processed table and get data_processed using `get_data_with_cache`
     query = f"""
         SELECT *
-        FROM {GCP_PROJECT_JEROME}.{BQ_DATASET}.processed_pv
+        FROM {GCP_PROJECT}.{BQ_DATASET}.processed_pv
         ORDER BY utc_time
     """
 
