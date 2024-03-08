@@ -23,18 +23,14 @@ def preprocess(min_date:str = '2009-01-01', max_date:str = '2015-01-01') -> None
     print(Fore.MAGENTA + "\n ⭐️ Use case: preprocess" + Style.RESET_ALL)
 
     # Query raw data from BUCKET BigQuery using `get_data_with_cache`
-    min_date = parse(min_date).strftime('%Y-%m-%d') # e.g '2009-01-01'
-    max_date = parse(max_date).strftime('%Y-%m-%d') # e.g '2009-01-01'
-
     query = f"""
-        SELECT {",".join(COLUMN_NAMES_RAW)}
-        FROM {GCP_PROJECT_WAGON}.{BQ_DATASET}.raw_{DATA_SIZE}
-        WHERE pickup_datetime BETWEEN '{min_date}' AND '{max_date}'
-        ORDER BY pickup_datetime
+        SELECT *
+        FROM {GCP_PROJECT_JEROME}.{BQ_DATASET}.raw_pv
+        ORDER BY _0
     """
 
     # Retrieve data using `get_data_with_cache`
-    data_query_cache_path = Path(LOCAL_DATA_PATH).joinpath("raw", f"query_{min_date}_{max_date}_{DATA_SIZE}.csv")
+    data_query_cache_path = Path(LOCAL_DATA_PATH).joinpath("raw", f"raw_pv.csv")
     data_query = get_data_with_cache(
         query=query,
         gcp_project=GCP_PROJECT,
@@ -45,24 +41,12 @@ def preprocess(min_date:str = '2009-01-01', max_date:str = '2015-01-01') -> None
     # Process data
     data_clean = clean_data(data_query)
 
-    X = data_clean.drop("fare_amount", axis=1)
-    y = data_clean[["fare_amount"]]
-
-    X_processed = preprocess_features(X)
-
-    # Load a DataFrame onto BigQuery containing [pickup_datetime, X_processed, y]
-    # using data.load_data_to_bq()
-    data_processed_with_timestamp = pd.DataFrame(np.concatenate((
-        data_clean[["pickup_datetime"]],
-        X_processed,
-        y,
-    ), axis=1))
 
     load_data_to_bq(
-        data_processed_with_timestamp,
+        data_clean,
         gcp_project=GCP_PROJECT,
         bq_dataset=BQ_DATASET,
-        table=f'processed_{DATA_SIZE}',
+        table=f'processed_pv',
         truncate=True
     )
 
@@ -89,26 +73,21 @@ def train(
     print(Fore.MAGENTA + "\n⭐️ Use case: train" + Style.RESET_ALL)
     print(Fore.BLUE + "\nLoading preprocessed validation data..." + Style.RESET_ALL)
 
-    min_date = parse(min_date).strftime('%Y-%m-%d') # e.g '2009-01-01'
-    max_date = parse(max_date).strftime('%Y-%m-%d') # e.g '2009-01-01'
 
     # Load processed data using `get_data_with_cache` in chronological order
-    # Try it out manually on console.cloud.google.com first!
 
-    # Below, our columns are called ['_0', '_1'....'_66'] on BQ, student's column names may differ
     query = f"""
-        SELECT * EXCEPT(_0)
-        FROM {GCP_PROJECT}.{BQ_DATASET}.processed_{DATA_SIZE}
-        WHERE _0 BETWEEN '{min_date}' AND '{max_date}'
-        ORDER BY _0 ASC
+        SELECT *
+        FROM {GCP_PROJECT}.{BQ_DATASET}.processed_pv
+        ORDER BY utc_time
     """
 
-    data_processed_cache_path = Path(LOCAL_DATA_PATH).joinpath("processed", f"processed_{min_date}_{max_date}_{DATA_SIZE}.csv")
+    data_processed_cache_path = Path(LOCAL_DATA_PATH).joinpath("processed", f"processed_pv.csv")
     data_processed = get_data_with_cache(
         gcp_project=GCP_PROJECT,
         query=query,
         cache_path=data_processed_cache_path,
-        data_has_header=False
+        data_has_header=True
     )
 
     if data_processed.shape[0] < 10:
@@ -116,16 +95,7 @@ def train(
         return None
 
     # Create (X_train_processed, y_train, X_val_processed, y_val)
-    train_length = int(len(data_processed)*(1-split_ratio))
-
-    data_processed_train = data_processed.iloc[:train_length, :].sample(frac=1).to_numpy()
-    data_processed_val = data_processed.iloc[train_length:, :].sample(frac=1).to_numpy()
-
-    X_train_processed = data_processed_train[:, :-1]
-    y_train = data_processed_train[:, -1]
-
-    X_val_processed = data_processed_val[:, :-1]
-    y_val = data_processed_val[:, -1]
+    # < MARIUS - ALI CODE HERE >
 
     # Train model using `model.py`
     model = load_model()
@@ -149,15 +119,11 @@ def train(
         row_count=len(X_train_processed),
     )
 
-    # Save results on the hard drive using power.ml_ops.registry
+    # Save results on the hard drive using taxifare.ml_logic.registry
     save_results(params=params, metrics=dict(mae=val_mae))
 
     # Save model weight on the hard drive (and optionally on GCS too!)
     save_model(model=model)
-
-    # The latest model should be moved to staging
-    if MODEL_TARGET == 'mlflow':
-        mlflow_transition_model(current_stage="None", new_stage="Staging")
 
     print("✅ train() done \n")
 
@@ -179,22 +145,20 @@ def evaluate(
     model = load_model(stage=stage)
     assert model is not None
 
-    min_date = parse(min_date).strftime('%Y-%m-%d') # e.g '2009-01-01'
-    max_date = parse(max_date).strftime('%Y-%m-%d') # e.g '2009-01-01'
 
     # Query your BigQuery processed table and get data_processed using `get_data_with_cache`
     query = f"""
-        SELECT * EXCEPT(_0)
-        FROM {GCP_PROJECT}.{BQ_DATASET}.processed_{DATA_SIZE}
-        WHERE _0 BETWEEN '{min_date}' AND '{max_date}'
+        SELECT *
+        FROM {GCP_PROJECT_JEROME}.{BQ_DATASET}.processed_pv
+        ORDER BY utc_time
     """
 
-    data_processed_cache_path = Path(f"{LOCAL_DATA_PATH}/processed/processed_{min_date}_{max_date}_{DATA_SIZE}.csv")
+    data_processed_cache_path = Path(LOCAL_DATA_PATH).joinpath("processed", f"processed_pv.csv")
     data_processed = get_data_with_cache(
         gcp_project=GCP_PROJECT,
         query=query,
         cache_path=data_processed_cache_path,
-        data_has_header=False
+        data_has_header=True
     )
 
     if data_processed.shape[0] == 0:

@@ -57,6 +57,10 @@ def init_baseline_mean():
 # function models
 # =============================================================================
 
+
+
+
+
 def model_yesterday(X: pd.DataFrame, input_date: str) -> pd.DataFrame:
     """
     Returns a simple previous day model
