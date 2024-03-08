@@ -5,12 +5,12 @@
 Make sure to create the bucket where you are located yourself (use GCP_REGION in the .env)
 Fill also the BUCKET_NAME variable with the name of your choice (must be globally unique and lower case! If you have an uppercase letter in your GitHub username, you’ll need to make it lower case!)
 e.g.
-""" python
+``` python
 BUCKET_NAME = power_<github-username>
-"""
-""" python
+```
+``` python
 direnv reload .
-"""
+```
 
 💻 Create our own dataset where we’ll store & query preprocessed data !
 
