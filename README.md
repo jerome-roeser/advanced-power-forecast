@@ -23,12 +23,15 @@ bq mk \
     $BQ_DATASET
 ```
 ``` python
+bq mk --location=$GCP_REGION $BQ_DATASET.raw_pv
+bq mk --location=$GCP_REGION $BQ_DATASET.raw_wind
 bq mk --location=$GCP_REGION $BQ_DATASET.processed_pv
 bq mk --location=$GCP_REGION $BQ_DATASET.processed_wind
 ```
 ```  python
 bq show
 bq show $BQ_DATASET
+bq show $BQ_DATASET.raw_pv
 bq show $BQ_DATASET.processed_pv
 ```
 
