@@ -4,11 +4,14 @@ import pandas as pd
 from pathlib import Path
 from colorama import Fore, Style
 from dateutil.parser import parse
+from typing import Dict, List, Tuple, Sequence
+from datetime import datetime
 
 from power.params import *
 from power.ml_ops.data import get_data_with_cache, load_data_to_bq, clean_pv_data
-from power.ml_ops.model import initialize_model, compile_model, train_model, evaluate_model
+from power.ml_ops.model import initialize_model, compile_model, train_model
 from power.ml_ops.registry import load_model, save_model, save_results
+from power.ml_ops.cross_val import get_X_y_seq
 
 def preprocess(min_date:str = '2009-01-01', max_date:str = '2015-01-01') -> None:
     """
@@ -51,6 +54,42 @@ def preprocess(min_date:str = '2009-01-01', max_date:str = '2015-01-01') -> None
 
     print("✅ preprocess() done \n")
 
+
+
+##############################################################################
+
+query = f"""
+        SELECT *
+        FROM {GCP_PROJECT}.{BQ_DATASET}.processed_pv
+        ORDER BY utc_time
+        """
+
+data_processed_cache_path = Path(LOCAL_DATA_PATH).joinpath("processed", f"processed_pv.csv")
+data_processed = get_data_with_cache(
+    gcp_project=GCP_PROJECT,
+    query=query,
+    cache_path=data_processed_cache_path,
+    data_has_header=True
+)
+
+data_processed = data_processed.rename(columns={'electricity': 'power'})
+
+data_processed.utc_time = pd.to_datetime(data_processed.utc_time,utc=True)
+
+# Split the data into training and testing sets
+train = data_processed[data_processed['utc_time'] < '2020-01-01']
+test = data_processed[data_processed['utc_time'] >= '2020-01-01']
+
+train = train[['power']]
+test = test[['power']]
+
+X_test, y_test = get_X_y_seq(test,
+                             number_of_sequences=1_000,
+                             input_length=48,
+                             output_length=24)
+
+
+
 @mlflow_run
 def train(
         min_date:str = '2009-01-01',
@@ -89,14 +128,32 @@ def train(
         data_has_header=True
     )
 
+    data_processed = data_processed.rename(columns={'electricity': 'power'})
+
     data_processed.utc_time = pd.to_datetime(data_processed.utc_time,utc=True)
 
     if data_processed.shape[0] < 240:
         print("❌ Not enough processed data retrieved to train on")
         return None
 
-    # Create (X_train_processed, y_train, X_val_processed, y_val)
-    # < MARIUS - ALI CODE HERE >
+
+    # Split the data into training and testing sets
+    train = data_processed[data_processed['utc_time'] < '2020-01-01']
+    test = data_processed[data_processed['utc_time'] >= '2020-01-01']
+
+    train = train[['power']]
+    test = test[['power']]
+
+    X_train, y_train = get_X_y_seq(train,
+                                   number_of_sequences=10_000,
+                                   input_length=48,
+                                   output_length=24)
+
+    # X_test, y_test = get_X_y_seq(test,
+    #                              number_of_sequences=1_000,
+    #                              input_length=48,
+    #                              output_length=24)
+
 
     # Train model using `model.py`
     model = load_model()
@@ -188,12 +245,20 @@ def evaluate(
     return mae
 
 
-def pred(X_pred: pd.DataFrame = None) -> np.ndarray:
+def pred(X_pred:str = '2013-05-08 12:00:00') -> np.ndarray:
     """
     Make a prediction using the latest trained model
     """
 
     print("\n⭐️ Use case: predict")
+
+    X_pred = datetime.strptime(X_pred, '%Y-%m-%d %H:%M:%S')
+    reference_datetime = datetime.strptime("1980-01-01 00:00:00", '%Y-%m-%d %H:%M:%S')
+    time_difference = X_pred - reference_datetime
+    time_difference_hours = time_difference.total_seconds() / 3600
+    input_date = X_test[time_difference_hours-47: time_difference_hours+1]
+
+
 
     if X_pred is None:
         X_pred = pd.DataFrame(dict(
