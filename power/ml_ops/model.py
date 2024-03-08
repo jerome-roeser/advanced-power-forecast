@@ -1,6 +1,7 @@
 import pandas as pd
 
-from tensorflow.keras import models, layers, optimizers, metrics, Lambda
+from tensorflow.keras import models, layers, optimizers, metrics
+from tensorflow.keras.layers import Lambda   
 
 
 
