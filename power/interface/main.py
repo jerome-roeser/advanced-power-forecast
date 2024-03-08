@@ -6,10 +6,9 @@ from colorama import Fore, Style
 from dateutil.parser import parse
 
 from power.params import *
-from power.ml_ops.data import get_data_with_cache, clean_data, load_data_to_bq
+from power.ml_ops.data import get_data_with_cache, load_data_to_bq, clean_pv_data
 from power.ml_ops.model import initialize_model, compile_model, train_model, evaluate_model
 from power.ml_ops.registry import load_model, save_model, save_results
-from power.ml_ops.registry import mlflow_run, mlflow_transition_model
 
 def preprocess(min_date:str = '2009-01-01', max_date:str = '2015-01-01') -> None:
     """
@@ -39,7 +38,7 @@ def preprocess(min_date:str = '2009-01-01', max_date:str = '2015-01-01') -> None
     )
 
     # Process data
-    data_clean = clean_data(data_query)
+    data_clean = clean_pv_data(data_query)
 
 
     load_data_to_bq(
@@ -57,9 +56,9 @@ def train(
         min_date:str = '2009-01-01',
         max_date:str = '2015-01-01',
         split_ratio: float = 0.02, # 0.02 represents ~ 1 month of validation data on a 2009-2015 train set
-        learning_rate=0.0005,
-        batch_size = 256,
-        patience = 2
+        learning_rate=0.02,
+        batch_size = 32,
+        patience = 5
     ) -> float:
 
     """
@@ -90,7 +89,9 @@ def train(
         data_has_header=True
     )
 
-    if data_processed.shape[0] < 10:
+    data_processed.utc_time = pd.to_datetime(data_processed.utc_time,utc=True)
+
+    if data_processed.shape[0] < 240:
         print("❌ Not enough processed data retrieved to train on")
         return None
 
@@ -101,22 +102,23 @@ def train(
     model = load_model()
 
     if model is None:
-        model = initialize_model(input_shape=X_train_processed.shape[1:])
+        model = initialize_model(X_train, y_train, n_unit=24)
 
     model = compile_model(model, learning_rate=learning_rate)
-    model, history = train_model(
-        model, X_train_processed, y_train,
-        batch_size=batch_size,
-        patience=patience,
-        validation_data=(X_val_processed, y_val)
-    )
+    model, history = train_model(model,
+                                X_train,
+                                y_train,
+                                validation_split = 0.3,
+                                batch_size = 32,
+                                epochs = 50
+                                )
 
     val_mae = np.min(history.history['val_mae'])
 
     params = dict(
         context="train",
-        training_set_size=DATA_SIZE,
-        row_count=len(X_train_processed),
+        training_set_size='40 years worth of data',
+        row_count=len(X_train),
     )
 
     # Save results on the hard drive using taxifare.ml_logic.registry
