@@ -16,21 +16,21 @@ direnv reload .
 
 Using bq and the following env variables, create a new dataset called power on your own GCP_PROJECT
 
-""" python
+``` python
 bq mk \
     --project_id $GCP_PROJECT \
     --data_location $BQ_REGION \
     $BQ_DATASET
-"""
-""" pyhton
+```
+``` python
 bq mk --location=$GCP_REGION $BQ_DATASET.processed_pv
 bq mk --location=$GCP_REGION $BQ_DATASET.processed_wind
-"""
-"""  python
+```
+```  python
 bq show
 bq show $BQ_DATASET
 bq show $BQ_DATASET.processed_pv
-"""
+```
 
 🎁 Look at make reset_all_files directive –> It resets all local files (csvs, models, …) and data from bq tables and buckets, but preserve local folder structure, bq tables schema, and gsutil buckets.
 
