@@ -4,12 +4,14 @@ import pandas as pd
 from pathlib import Path
 from colorama import Fore, Style
 from dateutil.parser import parse
+from typing import Dict, List, Tuple, Sequence
+from datetime import datetime
 
 from power.params import *
-from power.ml_ops.data import get_data_with_cache, clean_data, load_data_to_bq
-from power.ml_ops.model import initialize_model, compile_model, train_model, evaluate_model
+from power.ml_ops.data import get_data_with_cache, load_data_to_bq, clean_pv_data
+from power.ml_ops.model import initialize_model, compile_model, train_model
 from power.ml_ops.registry import load_model, save_model, save_results
-from power.ml_ops.registry import mlflow_run, mlflow_transition_model
+from power.ml_ops.cross_val import get_X_y_seq
 
 def preprocess(min_date:str = '2009-01-01', max_date:str = '2015-01-01') -> None:
     """
@@ -39,7 +41,7 @@ def preprocess(min_date:str = '2009-01-01', max_date:str = '2015-01-01') -> None
     )
 
     # Process data
-    data_clean = clean_data(data_query)
+    data_clean = clean_pv_data(data_query)
 
 
     load_data_to_bq(
@@ -52,14 +54,50 @@ def preprocess(min_date:str = '2009-01-01', max_date:str = '2015-01-01') -> None
 
     print("✅ preprocess() done \n")
 
+
+
+##############################################################################
+
+query = f"""
+        SELECT *
+        FROM {GCP_PROJECT}.{BQ_DATASET}.processed_pv
+        ORDER BY utc_time
+        """
+
+data_processed_cache_path = Path(LOCAL_DATA_PATH).joinpath("processed", f"processed_pv.csv")
+data_processed = get_data_with_cache(
+    gcp_project=GCP_PROJECT,
+    query=query,
+    cache_path=data_processed_cache_path,
+    data_has_header=True
+)
+
+data_processed = data_processed.rename(columns={'electricity': 'power'})
+
+data_processed.utc_time = pd.to_datetime(data_processed.utc_time,utc=True)
+
+# Split the data into training and testing sets
+train = data_processed[data_processed['utc_time'] < '2020-01-01']
+test = data_processed[data_processed['utc_time'] >= '2020-01-01']
+
+train = train[['power']]
+test = test[['power']]
+
+X_test, y_test = get_X_y_seq(test,
+                             number_of_sequences=1_000,
+                             input_length=48,
+                             output_length=24)
+
+
+
 @mlflow_run
 def train(
         min_date:str = '2009-01-01',
         max_date:str = '2015-01-01',
         split_ratio: float = 0.02, # 0.02 represents ~ 1 month of validation data on a 2009-2015 train set
-        learning_rate=0.0005,
-        batch_size = 256,
-        patience = 2
+        learning_rate=0.02,
+        batch_size = 32,
+        patience = 5
     ) -> float:
 
     """
@@ -90,33 +128,54 @@ def train(
         data_has_header=True
     )
 
-    if data_processed.shape[0] < 10:
+    data_processed = data_processed.rename(columns={'electricity': 'power'})
+
+    data_processed.utc_time = pd.to_datetime(data_processed.utc_time,utc=True)
+
+    if data_processed.shape[0] < 240:
         print("❌ Not enough processed data retrieved to train on")
         return None
 
-    # Create (X_train_processed, y_train, X_val_processed, y_val)
-    # < MARIUS - ALI CODE HERE >
+
+    # Split the data into training and testing sets
+    train = data_processed[data_processed['utc_time'] < '2020-01-01']
+    test = data_processed[data_processed['utc_time'] >= '2020-01-01']
+
+    train = train[['power']]
+    test = test[['power']]
+
+    X_train, y_train = get_X_y_seq(train,
+                                   number_of_sequences=10_000,
+                                   input_length=48,
+                                   output_length=24)
+
+    # X_test, y_test = get_X_y_seq(test,
+    #                              number_of_sequences=1_000,
+    #                              input_length=48,
+    #                              output_length=24)
+
 
     # Train model using `model.py`
     model = load_model()
 
     if model is None:
-        model = initialize_model(input_shape=X_train_processed.shape[1:])
+        model = initialize_model(X_train, y_train, n_unit=24)
 
     model = compile_model(model, learning_rate=learning_rate)
-    model, history = train_model(
-        model, X_train_processed, y_train,
-        batch_size=batch_size,
-        patience=patience,
-        validation_data=(X_val_processed, y_val)
-    )
+    model, history = train_model(model,
+                                X_train,
+                                y_train,
+                                validation_split = 0.3,
+                                batch_size = 32,
+                                epochs = 50
+                                )
 
     val_mae = np.min(history.history['val_mae'])
 
     params = dict(
         context="train",
-        training_set_size=DATA_SIZE,
-        row_count=len(X_train_processed),
+        training_set_size='40 years worth of data',
+        row_count=len(X_train),
     )
 
     # Save results on the hard drive using taxifare.ml_logic.registry
@@ -186,12 +245,20 @@ def evaluate(
     return mae
 
 
-def pred(X_pred: pd.DataFrame = None) -> np.ndarray:
+def pred(X_pred:str = '2013-05-08 12:00:00') -> np.ndarray:
     """
     Make a prediction using the latest trained model
     """
 
     print("\n⭐️ Use case: predict")
+
+    X_pred = datetime.strptime(X_pred, '%Y-%m-%d %H:%M:%S')
+    reference_datetime = datetime.strptime("1980-01-01 00:00:00", '%Y-%m-%d %H:%M:%S')
+    time_difference = X_pred - reference_datetime
+    time_difference_hours = time_difference.total_seconds() / 3600
+    input_date = X_test[time_difference_hours-47: time_difference_hours+1]
+
+
 
     if X_pred is None:
         X_pred = pd.DataFrame(dict(

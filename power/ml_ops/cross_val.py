@@ -90,21 +90,26 @@ def get_X_y_strides(fold: pd.DataFrame, input_length: int, output_length: int, s
 def get_Xi_yi(
     fold:pd.DataFrame,
     input_length:int,       # 48
-    output_length:int):     # 24
+    output_length:int,      # 24
+    gap_hours):
     '''
     - given a fold, it returns one sequence (X_i, y_i)
     - with the starting point of the sequence being chosen at random
     - TARGET is the variable(s) we want to predict (name of the column(s))
     '''
     TARGET = 'power'
-    first_possible_start = 0                                                    # the +1 accounts for the index, that is exclusive.
-    last_possible_start = len(fold) - (input_length + output_length) + 1        # It can start as long as there are still
-                                                                                # 48 + 1 days after the 1st day.
-    random_start = np.random.randint(first_possible_start, last_possible_start) # np.random to pick a day inside the possible interval.
+    first_possible_start = 0
+    last_possible_start = len(fold) - (input_length + gap_hours + output_length) + 1
 
-    X_i = fold.iloc[random_start:random_start+input_length]
-    y_i = fold.iloc[random_start+input_length:
-                  random_start+input_length+output_length][[TARGET]]            # creates a pd.DataFrame for the target y
+    random_start = np.random.randint(first_possible_start, last_possible_start)
+
+    input_start = random_start
+    input_end = random_start + input_length
+    target_start = input_end + gap_hours
+    target_end = target_start + output_length
+
+    X_i = fold.iloc[input_start:input_end]
+    y_i = fold.iloc[target_start:target_end][[TARGET]]    # creates a pd.DataFrame for the target y
 
     return (X_i, y_i)
 
@@ -112,7 +117,8 @@ def get_X_y_seq(
     fold:pd.DataFrame,
     number_of_sequences:int,
     input_length:int,
-    output_length:int):
+    output_length:int,
+    gap_hours=0):
     '''
     Given a fold, it creates a series of sequences randomly
     as many as being specified
@@ -121,7 +127,7 @@ def get_X_y_seq(
     X, y = [], []                                                 # lists for the sequences for X and y
 
     for i in range(number_of_sequences):
-        (Xi, yi) = get_Xi_yi(fold, input_length, output_length)   # calls the previous function to generate sequences X + y
+        (Xi, yi) = get_Xi_yi(fold, input_length, output_length, gap_hours)   # calls the previous function to generate sequences X + y
         X.append(Xi)
         y.append(yi)
 
