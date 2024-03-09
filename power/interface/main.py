@@ -13,7 +13,8 @@ from power.ml_ops.model import initialize_model, compile_model, train_model
 from power.ml_ops.registry import load_model, save_model, save_results
 from power.ml_ops.cross_val import get_X_y_seq
 
-def preprocess(min_date:str = '2009-01-01', max_date:str = '2015-01-01') -> None:
+def preprocess(start_date:str = '1980-01-01',
+               stop_date:str = '2022-12-31') -> None:
     """
     - Query the raw dataset from Le Wagon's BigQuery dataset
     - Cache query result as a local CSV if it doesn't exist locally
@@ -57,8 +58,8 @@ def preprocess(min_date:str = '2009-01-01', max_date:str = '2015-01-01') -> None
 
 
 def train(
-        min_date:str = '2009-01-01',
-        max_date:str = '2015-01-01',
+        start_date:str = '1980-01-01',
+        stop_date:str = '2019-12-30',
         split_ratio: float = 0.02, # 0.02 represents ~ 1 month of validation data on a 2009-2015 train set
         learning_rate=0.02,
         batch_size = 32,
@@ -78,7 +79,6 @@ def train(
 
 
     # Load processed data using `get_data_with_cache` in chronological order
-
     query = f"""
         SELECT *
         FROM {GCP_PROJECT}.{BQ_DATASET}.processed_pv
@@ -95,7 +95,7 @@ def train(
 
     # the model uses power as feature -> fix that in raw data
     data_processed = data_processed.rename(columns={'electricity': 'power'})
-    # the processed data form bq needs to be converted to datetime object
+    # the processed data from bq needs to be converted to datetime object
     data_processed.utc_time = pd.to_datetime(data_processed.utc_time,utc=True)
 
     if data_processed.shape[0] < 240:
@@ -212,32 +212,34 @@ def pred(X_pred:str = '2013-05-08 12:00:00') -> np.ndarray:
 
     print("\n⭐️ Use case: predict")
 
-    X_pred = datetime.strptime(X_pred, '%Y-%m-%d %H:%M:%S')
-    reference_datetime = datetime.strptime("1980-01-01 00:00:00", '%Y-%m-%d %H:%M:%S')
-    time_difference = X_pred - reference_datetime
-    time_difference_hours = time_difference.total_seconds() / 3600
-    input_date = X_test[time_difference_hours-47: time_difference_hours+1]
+    # X_pred = datetime.strptime(X_pred, '%Y-%m-%d %H:%M:%S')
+    # reference_datetime = datetime.strptime("1980-01-01 00:00:00", '%Y-%m-%d %H:%M:%S')
+    # time_difference = X_pred - reference_datetime
+    # time_difference_hours = time_difference.total_seconds() / 3600
+    # input_date = X_test[time_difference_hours-47: time_difference_hours+1]
 
 
 
-    if X_pred is None:
-        X_pred = pd.DataFrame(dict(
-        pickup_datetime=[pd.Timestamp("2013-07-06 17:18:00", tz='UTC')],
-        pickup_longitude=[-73.950655],
-        pickup_latitude=[40.783282],
-        dropoff_longitude=[-73.984365],
-        dropoff_latitude=[40.769802],
-        passenger_count=[1],
-    ))
+    # if X_pred is None:
+    #     X_pred = pd.DataFrame(dict(
+    #     pickup_datetime=[pd.Timestamp("2013-07-06 17:18:00", tz='UTC')],
+    #     pickup_longitude=[-73.950655],
+    #     pickup_latitude=[40.783282],
+    #     dropoff_longitude=[-73.984365],
+    #     dropoff_latitude=[40.769802],
+    #     passenger_count=[1],
+    # ))
 
     model = load_model()
     assert model is not None
 
-    X_processed = preprocess_features(X_pred)
-    y_pred = model.predict(X_processed)
+    # X_processed = preprocess_features(X_pred)
+    # y_pred = model.predict(X_processed)
 
-    print("\n✅ prediction done: ", y_pred, y_pred.shape, "\n")
-    return y_pred
+    # print("\n✅ prediction done: ", y_pred, y_pred.shape, "\n")
+    print("\n✅ prediction done: \n")
+    return model # change it back! to return y_pred
+    # return y_pred
 
 
 if __name__ == '__main__':
