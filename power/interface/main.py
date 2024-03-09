@@ -56,41 +56,6 @@ def preprocess(min_date:str = '2009-01-01', max_date:str = '2015-01-01') -> None
 
 
 
-##############################################################################
-
-query = f"""
-        SELECT *
-        FROM {GCP_PROJECT}.{BQ_DATASET}.processed_pv
-        ORDER BY utc_time
-        """
-
-data_processed_cache_path = Path(LOCAL_DATA_PATH).joinpath("processed", f"processed_pv.csv")
-data_processed = get_data_with_cache(
-    gcp_project=GCP_PROJECT,
-    query=query,
-    cache_path=data_processed_cache_path,
-    data_has_header=True
-)
-
-data_processed = data_processed.rename(columns={'electricity': 'power'})
-
-data_processed.utc_time = pd.to_datetime(data_processed.utc_time,utc=True)
-
-# Split the data into training and testing sets
-train = data_processed[data_processed['utc_time'] < '2020-01-01']
-test = data_processed[data_processed['utc_time'] >= '2020-01-01']
-
-train = train[['power']]
-test = test[['power']]
-
-X_test, y_test = get_X_y_seq(test,
-                             number_of_sequences=1_000,
-                             input_length=48,
-                             output_length=24)
-
-
-
-@mlflow_run
 def train(
         min_date:str = '2009-01-01',
         max_date:str = '2015-01-01',
@@ -128,8 +93,9 @@ def train(
         data_has_header=True
     )
 
+    # the model uses power as feature -> fix that in raw data
     data_processed = data_processed.rename(columns={'electricity': 'power'})
-
+    # the processed data form bq needs to be converted to datetime object
     data_processed.utc_time = pd.to_datetime(data_processed.utc_time,utc=True)
 
     if data_processed.shape[0] < 240:
@@ -148,11 +114,6 @@ def train(
                                    number_of_sequences=10_000,
                                    input_length=48,
                                    output_length=24)
-
-    # X_test, y_test = get_X_y_seq(test,
-    #                              number_of_sequences=1_000,
-    #                              input_length=48,
-    #                              output_length=24)
 
 
     # Train model using `model.py`
@@ -189,7 +150,6 @@ def train(
     return val_mae
 
 
-@mlflow_run
 def evaluate(
         min_date:str = '2014-01-01',
         max_date:str = '2015-01-01',
