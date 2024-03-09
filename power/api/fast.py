@@ -49,7 +49,7 @@ def extract_pv_data(input_date: str, n_days=10):
         }
     return {input_date: extracted_data}
 
-@app.get("/predict_baseline_yesterday")
+@app.get("/baseline_yesterday")
 def predict_baseline_yesterday(input_date: str):
     data_pv_clean = app.state.data_pv_clean
     data = data_pv_clean[data_pv_clean['utc_time'] < input_date][-24:]
