@@ -36,18 +36,15 @@ app.add_middleware(
 
 @app.get("/extract_data")
 def extract_pv_data(input_date: str, n_days=10):
-    pv_data_clean = app.state.data_pv_clean
-    n_rows = 24 * n_days
-    days_before = pv_data_clean[pv_data_clean['utc_time'] < input_date] \
-                                        ['electricity'][-n_rows:].to_list()
-    day_after = pv_data_clean[pv_data_clean['utc_time'] >= input_date] \
-                                        ['electricity'][:24].to_list()
+    data_pv_clean = app.state.data_pv_clean
 
-    extracted_data = {
-        'days_before':days_before,
-        'day_after':day_after
-        }
-    return {input_date: extracted_data}
+    n_rows = 24 * int(n_days)
+    df_before = data_pv_clean[data_pv_clean['utc_time'] < input_date][-n_rows:]
+    days_before = df_before.electricity.to_list()
+
+    df_after = data_pv_clean[data_pv_clean['utc_time'] >= input_date][:24]
+    day_after = df_after.electricity.to_list()
+    return {input_date: {'days_before':days_before, 'day_after':day_after}}
 
 @app.get("/baseline_yesterday")
 def predict_baseline_yesterday(input_date: str):
