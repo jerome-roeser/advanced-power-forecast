@@ -10,21 +10,22 @@ from pathlib import Path
 from power.params import *
 
 app = FastAPI()
-app.state.data_pv = get_pv_data()
-app.state.data_pv_clean = clean_pv_data(app.state.data_pv)
-# data_processed_cache_path = Path(LOCAL_DATA_PATH).joinpath("processed", f"processed_pv.csv")
+# app.state.data_pv = get_pv_data()
+# app.state.data_pv_clean = clean_pv_data(app.state.data_pv)
+app.state.model = load_model()
 
-# query = f"""
-#     SELECT *
-#     FROM {GCP_PROJECT}.{BQ_DATASET}.processed_pv
-#     ORDER BY utc_time
-# """
-# app.state.data_pv_clean = get_data_with_cache(
-#     gcp_project=GCP_PROJECT,
-#     query=query,
-#     cache_path=data_processed_cache_path,
-#     data_has_header=True
-# )
+data_processed_cache_path = Path(LOCAL_DATA_PATH).joinpath("processed", f"processed_pv.csv")
+query = f"""
+    SELECT *
+    FROM {GCP_PROJECT}.{BQ_DATASET}.processed_pv
+    ORDER BY utc_time
+"""
+app.state.data_pv_clean = get_data_with_cache(
+    gcp_project=GCP_PROJECT,
+    query=query,
+    cache_path=data_processed_cache_path,
+    data_has_header=True
+)
 
 # app.state.model = load_model()
 
@@ -58,37 +59,37 @@ app.add_middleware(
 
 #     return converted_dict
 
-@app.get("/predict/previous_value")
-def predict_previous_value(input_date: str):
-    pv_data_clean = app.state.data_pv_clean
-    yesterday_baseline = model_yesterday(pv_data_clean, input_date)
-    values = yesterday_baseline.get('electricity').to_list()
+@app.get("/predict/baseline_yesterday")
+def predict_baseline_yesterday(input_date: str):
+    data_pv_clean = app.state.data_pv_clean
+    data = data_pv_clean[data_pv_clean['utc_time'] < input_date][-24:]
+    values = data.electricity.to_list()
     return {input_date: values}
 
-# @app.get("/predict")
-# def predict(input_date: str, n_days=2):
-#     pv_data_clean = app.state.data_pv_clean
-#     input_timestamp = pd.Timestamp(input_date, tz='UTC')
-#     idx = pv_data_clean[pv_data_clean.utc_time == input_timestamp].index[0]
+@app.get("/predict")
+def predict(input_date: str, n_days=2):
+    # pv_data_clean = app.state.data_pv_clean
+    # input_timestamp = pd.Timestamp(input_date, tz='UTC')
+    # idx = pv_data_clean[pv_data_clean.utc_time == input_timestamp].index[0]
 
-#     n_rows = 24 * n_days
-#     if idx <= n_rows:
-#         df = pv_data_clean.iloc[0:idx,:]
-#     else:
-#         df = pv_data_clean.iloc[idx-n_rows:idx,:].reset_index()
+    # n_rows = 24 * n_days
+    # if idx <= n_rows:
+    #     df = pv_data_clean.iloc[0:idx,:]
+    # else:
+    #     df = pv_data_clean.iloc[idx-n_rows:idx,:].reset_index()
 
-#     model = app.state.model
-#     assert model is not None
+    # model = app.state.model
+    # assert model is not None
 
-#     y_pred = model.predict(df)
+    # y_pred = model.predict(df)
 
-#     predicted_data = {
-#         'utc_time':XXX.get('utc_time').tolist(),
-#         'local_time':XXX.get('local_time').tolist(),
-#         'electricity':XXX.get('electricity').tolist()
-#     }
+    # predicted_data = {
+    #     'utc_time':XXX.get('utc_time').tolist(),
+    #     'local_time':XXX.get('local_time').tolist(),
+    #     'electricity':XXX.get('electricity').tolist()
+    # }
 
-#     return {'predicted_data': predicted_data}
+    return {'predicted_data': input_date}
 
 
 # def predict(
@@ -140,8 +141,7 @@ def extract_pv_data(input_date: str, n_days=10):
         'local_time':df.get('local_time').tolist(),
         'electricity':df.get('electricity').tolist()
     }
-    return extracted_data
-
+    return {'predicted_data': input_date}
 
 @app.get("/")
 def root():
