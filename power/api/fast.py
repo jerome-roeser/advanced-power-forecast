@@ -63,7 +63,7 @@ def predict_baseline_yesterday(input_date: str, n_days=0, power_source='pv'):
     data = data_pv_clean[data_pv_clean['utc_time'] < input_date][-24:]
     baseline_data = {
         'date':data.utc_time.to_list(),
-        'power_source':data.utc_time.to_list()
+        'power_source':data.electricity.to_list()
         }
     return {input_date: baseline_data}
 

@@ -1,4 +1,4 @@
-import datetime
+
 import requests
 
 from streamlit_folium import folium_static
@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import streamlit as st
+import datetime
 
 
 '''
@@ -21,53 +22,61 @@ st.sidebar.markdown(f"""
 
 prediction_date = st.sidebar.date_input(
                             label='Power prediction date',
-                            value=datetime.date(2010, 1, 1),
-                            min_value=datetime.date(1980, 1, 10),
-                            max_value=datetime.date(2020, 1, 1),
+                            value=datetime.date(2021, 7, 6),
+                            min_value=datetime.date(2020, 1, 1),
+                            max_value=datetime.date(2022, 12, 30),
                             )
-predicition_time = st.sidebar.time_input(
-                            label='Power prediction time',
-                            value=datetime.time(0, 00),
-                            step=3600)
-input_prediction_date = f"{prediction_date} {predicition_time}"
+# predicition_time = st.sidebar.time_input(
+#                             label='Power prediction time',
+#                             value=datetime.time(0, 00),
+#                             step=3600)
+input_prediction_date = f"{prediction_date} 00:00:00"
 # st.sidebar.write(input_prediction_date)
 
 
 locations = st.sidebar.expander("Available locations")
-days_to_display = st.sidebar.slider('Select the number of past data to display', 1, 10, 5)
-
-input_prediction_date = f"{prediction_date} {predicition_time}"
+# days_to_display = st.sidebar.slider('Select the number of past data to display', 1, 10, 5)
 
 
 location = locations.radio("Locations", ["Berlin - Tempelhof", "Berlin - Tegel", "Berlin - Schönefeld"])
 
 
 # make api call
+# make api call
 base_url = "http://127.0.0.1:8000"
 
-# endpoints
-endpoint_data = "/extract_data"
-endpoint_baseline = "/predict/previous_value"
-endpoint_model = "/predict"
-
-# urls
-url_data = f"{base_url}{endpoint_data}"
-url_baseline = f"{base_url}{endpoint_baseline}"
-url_model = f"{base_url}{endpoint_model}"
-
-params = {
-    'input_date':input_prediction_date
+# model
+params_model ={
+    'input_date':input_prediction_date,
+    'n_days': 2,
+    'power_source': 'pv'
     }
 
-# responses
-response_data = requests.get(url_data, params=params).json()
-data_df = pd.DataFrame(response_data)
+endpoint_model = "/baseline_yesterday"
+url_model= f"{base_url}{endpoint_model}"
+response_model = requests.get(url_model, params_model).json()
 
-response_baseline = requests.get(url_baseline, params=params).json()
-baseline_df = pd.DataFrame(response_baseline)
+# baseline
+params_baseline ={
+    'input_date':input_prediction_date,
+    'n_days': 2,
+    'power_source': 'pv'
+    }
 
-# response_model = requests.get(url_model, params=params).json()
-# model_df = pd.DataFrame(response_model)
+endpoint_baseline = "/baseline_yesterday"
+url_baseline= f"{base_url}{endpoint_baseline}"
+response_baseline = requests.get(url_baseline, params_baseline).json()
+
+# data
+params_data ={
+    'input_date':input_prediction_date,
+    'n_days': 10,
+    'power_source': 'pv'
+    }
+
+endpoint_data = "/extract_data"
+url_data = f"{base_url}{endpoint_data}"
+response_data = requests.get(url_data, params_data).json()
 
 
 # Main Panel
@@ -75,34 +84,36 @@ baseline_df = pd.DataFrame(response_baseline)
 st.write(f"**Chosen location:** :red[{location}]")
 
 
-# Graph for PV data
-hours_to_display = 24 * days_to_display
+# set-up 4 DatFrames according to input date and type of model
+X = pd.DataFrame(response_data.get(input_prediction_date)['days_before'])
+y = pd.DataFrame(response_data.get(input_prediction_date)['day_after'])
+y_baseline = pd.DataFrame(response_baseline.get(input_prediction_date))
+y_predicted = pd.DataFrame(response_model.get('dataframe to predict'))
 
-# set-up 3 DatFrames according to input date and type of model
-X = data_df.iloc[240-hours_to_display:-24,:]
-y = data_df.iloc[-24:,:]
-y_baseline = baseline_df.set_index(np.arange(240,240+24))
-# y_model = model_df.set_index(np.arange(240,240+24))
+# convert date columns to datetime object
+X.date = pd.to_datetime(X.date,utc=True)
+y.date = pd.to_datetime(y.date, utc=True)
+y_baseline.date = pd.to_datetime(y_baseline.date, utc=True) + datetime.timedelta(days=1)
 
-fig, ax = plt.subplots()
-ax.plot(X.get('electricity'), label='current production data')
-ax.plot(y.get('electricity'), label='true data')
-ax.plot(y_baseline.get(input_prediction_date), label='baseline data_API')
-ax.legend()
+# Matplotlib pyplot of the PV data
+fig, ax = plt.subplots(sharex=True, sharey=True)
+ax.plot(X.date, X.power_source, label='current production data')
+ax.plot(y.date, y.power_source, label='true production')
+ax.plot(y_baseline.date, y_baseline.power_source, label='baseline estimate')
 plt.ylim(0,1)
-plt.xlim(0,265)
+plt.legend()
 st.pyplot(fig)
 
 
 # Metrics
-mean_training = X.get('electricity').mean()
-mean_predicted = y_model.get(input_prediction_date).mean()
-mean_diff = mean_predicted - mean_training
+mean_training = X.power_source.mean()
+mean_baseline = y_baseline.power_source.mean()
+mean_diff = mean_baseline - mean_training
 
 # Trick to use 4 columns to display the metrics centered below graph
 col1, col2, col3, col4 = st.columns(4)
 col2.metric("Training", round(mean_training,3), "")
-col3.metric("Predicted", round(mean_predicted,3), round(mean_diff,3))
+col3.metric("Predicted", round(mean_baseline,3), round(mean_diff,3))
 
 
 # Map with the location
