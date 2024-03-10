@@ -9,6 +9,12 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from power.params import *
 
+# Request URLs:
+# http://127.0.0.1:8000/extract_data?input_date=2018-07-06%2000%3A00%3A00&n_days=10&power_source=pv
+# http://127.0.0.1:8000/baseline_yesterday?input_date=2019-07-06%2000%3A00%3A00&n_days=10&power_source=pv
+# http://127.0.0.1:8000/predict?input_date=2020-07-06%2000%3A00%3A00&n_days=10&power_source=pv
+
+
 app = FastAPI()
 app.state.model = load_model()
 
@@ -35,26 +41,36 @@ app.add_middleware(
 )
 
 @app.get("/extract_data")
-def extract_pv_data(input_date: str, n_days=10):
+def extract_pv_data(input_date: str, n_days=10, power_source='pv'):
     data_pv_clean = app.state.data_pv_clean
 
     n_rows = 24 * int(n_days)
     df_before = data_pv_clean[data_pv_clean['utc_time'] < input_date][-n_rows:]
-    days_before = df_before.electricity.to_list()
+    days_before = {
+        'date':df_before.utc_time.to_list(),
+        'power_source':df_before.electricity.to_list()
+        }
 
     df_after = data_pv_clean[data_pv_clean['utc_time'] >= input_date][:24]
-    day_after = df_after.electricity.to_list()
+    day_after = {
+        'date':df_after.utc_time.to_list(),
+        'power_source':df_after.electricity.to_list()
+        }
+
     return {input_date: {'days_before':days_before, 'day_after':day_after}}
 
 @app.get("/baseline_yesterday")
-def predict_baseline_yesterday(input_date: str):
+def predict_baseline_yesterday(input_date: str, n_days=0, power_source='pv'):
     data_pv_clean = app.state.data_pv_clean
     data = data_pv_clean[data_pv_clean['utc_time'] < input_date][-24:]
-    values = data.electricity.to_list()
-    return {input_date: values}
+    baseline_data = {
+        'date':data.utc_time.to_list(),
+        'power_source':data.utc_time.to_list()
+        }
+    return {input_date: baseline_data}
 
 @app.get("/predict")
-def predict(input_date: str, n_days=2):
+def predict(input_date: str, n_days=2, power_source='pv'):
     pv_data_clean = app.state.data_pv_clean
     X_pred = pv_data_clean[pv_data_clean['utc_time'] < input_date][-48:]
 
@@ -64,8 +80,8 @@ def predict(input_date: str, n_days=2):
     # y_pred = model.predict(df)
 
     predicted_data = {
-        'days_before':X_pred.electricity.to_list(),
-        'day_after':'y_pred'
+        'date':X_pred.utc_time.to_list(),
+        'power_source':X_pred.electricity.to_list()
         }
 
     return {f'dataframe to predict': X_pred.electricity.to_list()}
