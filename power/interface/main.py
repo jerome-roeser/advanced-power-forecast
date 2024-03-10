@@ -82,7 +82,6 @@ def train(
     query = f"""
         SELECT *
         FROM {GCP_PROJECT}.{BQ_DATASET}.processed_pv
-        WHERE utc_time BETWEEN {min_date} AND {max_date}
         ORDER BY utc_time
     """
 
@@ -102,7 +101,6 @@ def train(
     if data_processed.shape[0] < 240:
         print("❌ Not enough processed data retrieved to train on")
         return None
-
 
     # Split the data into training and testing sets
     train = data_processed[data_processed['utc_time'] < '2020-01-01']
