@@ -1,10 +1,8 @@
 import pandas as pd
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from power.ml_ops.data import get_pv_data, clean_pv_data, get_data_with_cache
-from power.ml_ops.model import model_yesterday
+from power.ml_ops.data import get_data_with_cache
 from power.ml_ops.registry import load_model
-from datetime import datetime, timedelta
 
 from pathlib import Path
 from power.params import *

@@ -13,8 +13,8 @@ from power.ml_ops.model import initialize_model, compile_model, train_model
 from power.ml_ops.registry import load_model, save_model, save_results
 from power.ml_ops.cross_val import get_X_y_seq
 
-def preprocess(start_date:str = '1980-01-01',
-               stop_date:str = '2022-12-31') -> None:
+def preprocess(min_date = '1980-01-01 00:00:00',
+               max_date = '2022-12-31 23:00:00') -> None:
     """
     - Query the raw dataset from Le Wagon's BigQuery dataset
     - Cache query result as a local CSV if it doesn't exist locally
@@ -58,8 +58,8 @@ def preprocess(start_date:str = '1980-01-01',
 
 
 def train(
-        start_date:str = '1980-01-01',
-        stop_date:str = '2019-12-30',
+        min_date = '1980-01-01 00:00:00',
+        max_date = '2019-12-30 23:00:00',
         split_ratio: float = 0.02, # 0.02 represents ~ 1 month of validation data on a 2009-2015 train set
         learning_rate=0.02,
         batch_size = 32,
@@ -82,6 +82,7 @@ def train(
     query = f"""
         SELECT *
         FROM {GCP_PROJECT}.{BQ_DATASET}.processed_pv
+        WHERE utc_time BETWEEN {min_date} AND {max_date}
         ORDER BY utc_time
     """
 
@@ -243,7 +244,9 @@ def pred(X_pred:str = '2013-05-08 12:00:00') -> np.ndarray:
 
 
 if __name__ == '__main__':
-    preprocess(min_date='2009-01-01', max_date='2015-01-01')
-    train(min_date='2009-01-01', max_date='2015-01-01')
+    preprocess(min_date = '1980-01-01 00:00:00',
+               max_date = '2022-12-31 23:00:00')
+    train(min_date = '1980-01-01 00:00:00',
+          max_date = '2019-12-30 23:00:00')
     evaluate(min_date='2009-01-01', max_date='2015-01-01')
     pred()
