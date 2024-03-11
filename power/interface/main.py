@@ -254,5 +254,5 @@ if __name__ == '__main__':
                max_date = '2022-12-31 23:00:00')
     train(min_date = '1980-01-01 00:00:00',
           max_date = '2019-12-30 23:00:00')
-    evaluate(min_date='2009-01-01', max_date='2015-01-01')
+    # evaluate(min_date='2009-01-01', max_date='2015-01-01')
     pred()
