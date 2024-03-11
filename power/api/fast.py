@@ -7,6 +7,7 @@ from power.interface.main import pred #, postprocess
 
 from pathlib import Path
 from power.params import *
+from power.utils import compress
 
 # Request URLs:
 # http://127.0.0.1:8000/extract_data?input_date=2018-07-06%2000%3A00%3A00&n_days=10&power_source=pv
@@ -70,12 +71,13 @@ def postprocess(
   # define time period (3 days) for plotting
   today_timestamp = pd.Timestamp(today, tz='UTC')
   window_df= pd.date_range(
-            start=today_timestamp - pd.Timedelta(days=2),
-            end=  today_timestamp + pd.Timedelta(days=1),
+            start=today_timestamp - pd.Timedelta(days=1),
+            end=  today_timestamp + pd.Timedelta(days=2) - pd.Timedelta(hours=1),
             freq=pd.Timedelta(hours=1)).to_frame(index=False, name='utc_time')
+  #print('start: ', today_timestamp - pd.Timedelta(days=1))
+  #print('end: ', today_timestamp + pd.Timedelta(days=2))
 
   # create df with the preprocessed data in the time window
-
   plot_df = pd.merge(window_df, preprocessed_df, on='utc_time', how='inner')
 
   # add statistics in the time window
@@ -85,8 +87,7 @@ def postprocess(
   plot_df = pd.merge(plot_df, stats_df, on='hour_of_year', how='inner')
 
   # add prediction for day-ahead in time window
-  input_pred = f"{today} 12:00:00" # '2013-05-08 12:00:00'
-  pred_df = pred(input_pred)
+  #qbreakpoint()
   plot_df = pd.merge(plot_df, pred_df, on='utc_time', how='left')
 
   return plot_df
@@ -111,17 +112,28 @@ def postprocess(
 
 @app.get("/visualisation")
 def visualisation(input_date: str, power_source='pv'):
+
   today = input_date
   preprocessed_df = app.state.data_pv_clean
   stats_df = get_stats_table(app.state.data_pv_clean, capacity=False)
   # dummy (use predict function instead)
-  pred_df = app.state.data_pv_clean[['utc_time','electricity']]
+  #pred_df = app.state.data_pv_clean[['utc_time','electricity']]
+  #pred_df = pred_df.rename(columns={'electricity':'pred'})
+  input_pred = f"{today} 12:00:00" # '2013-05-08 12:00:00'
+  pred_df = pred(input_pred)
+  pred_df = pred_df.drop(columns='local_time')
   pred_df = pred_df.rename(columns={'electricity':'pred'})
+  pred_df.utc_time = pd.to_datetime(pred_df.utc_time,utc=True)
   #
+  #breakpoint()
   plot_df = postprocess(today, preprocessed_df, stats_df, pred_df)
   # as dict for data transfer from backend to frontend
-  plot_dict = plot_df.to_dict()
+  #breakpoint()
 
+  plot_df = plot_df.fillna(0.0)
+  #plot_df = compress(plot_df)
+
+  plot_dict = plot_df.to_dict()
   return plot_dict
 
 

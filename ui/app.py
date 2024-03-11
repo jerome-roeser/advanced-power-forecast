@@ -65,12 +65,20 @@ plot_df.utc_time = pd.to_datetime(plot_df.utc_time,utc=True)
 
 ### Show plots =================================================================
 
+#print(plot_df)
+#breakpoint()
+
+
 today_dt = pd.Timestamp(today_date, tz='UTC')
 time = plot_df.utc_time.values
 
-sep_future = today_dt
-sep_past = today_dt - pd.Timedelta(days=1)
-sep_order = today_dt - pd.Timedelta(hours=12)
+#sep_future = today_dt
+#sep_past = today_dt - pd.Timedelta(days=1)
+sep_future = today_dt + pd.Timedelta(days=1)
+sep_past = today_dt
+
+#sep_order = today_dt - pd.Timedelta(hours=12)
+sep_order = today_dt - pd.Timedelta(hours=36)
 
 fig, ax = plt.subplots(figsize=(15,5))
 # time
@@ -109,7 +117,8 @@ ax.step(time[hori:], plot_df.pred.values[hori:], where='pre',
 ax.xaxis.set_major_locator(dates.HourLocator(byhour=range(24), interval=12, tz='UTC'))
 ax.xaxis.set_major_formatter(dates.DateFormatter('%H:%M %d/%m/%Y'))
 
-ax.set_xlim(today_dt - pd.Timedelta(days=2), today_dt + pd.Timedelta(days=1))
+#ax.set_xlim(today_dt - pd.Timedelta(days=2), today_dt + pd.Timedelta(days=1))
+ax.set_xlim(today_dt - pd.Timedelta(days=1), today_dt + pd.Timedelta(days=2))
 ax.set_ylim(0,1.0)
 ax.set_xlabel('Time')
 #ax.set_ylabel('Capacity factor in %')
