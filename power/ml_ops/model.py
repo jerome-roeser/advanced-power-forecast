@@ -1,21 +1,23 @@
 import pandas as pd
 
 from tensorflow.keras import models, layers, optimizers, metrics
-from tensorflow.keras.layers import Lambda   
+from tensorflow.keras import backend as K
+from tensorflow.keras.layers import Lambda
+from tensorflow.keras.callbacks import EarlyStopping
 
 
 
 # keras models
 # =============================================================================
 
-def init_RNN(X_train, y_train):
+def initialize_model(X_train, y_train, n_unit=24):
 
     # 1 - RNN architecture
     # ======================
     model = models.Sequential()
 
     ## 1.1 - Recurrent Layer
-    model.add(layers.LSTM(24,
+    model.add(layers.LSTM(n_unit,
                           activation='tanh',
                           return_sequences = False,
                           input_shape=(X_train.shape[1],X_train.shape[2])
@@ -24,12 +26,39 @@ def init_RNN(X_train, y_train):
     output_length = y_train.shape[1]
     model.add(layers.Dense(output_length, activation='linear'))
 
-    # 2 - Compiler
-    # ======================
-    adam = optimizers.Adam(learning_rate=0.02)
-    model.compile(loss='mse', optimizer=adam, metrics=["mae"])
+    return model
+
+def compile_model(model, learning_rate=0.02):
+
+    # def r_squared(y_true, y_pred):
+    #     ss_res = K.sum(K.square(y_true - y_pred))
+    #     ss_tot = K.sum(K.square(y_true - K.mean(y_true)))
+    #     return (1 - ss_res/(ss_tot + K.epsilon()))
+
+    adam = optimizers.Adam(learning_rate=learning_rate)
+    # model.compile(loss='mse', optimizer=adam, metrics=['mae', r_squared])
+    model.compile(loss='mse', optimizer=adam, metrics=['mae'])
 
     return model
+
+def train_model(model,
+                X_train,
+                y_train,
+                validation_split = 0.3,
+                batch_size = 32,
+                epochs = 50):
+    es = EarlyStopping(monitor = "val_mae",
+                       mode = "min",
+                       patience = 5,
+                       restore_best_weights = True)
+    history = model.fit(X_train, y_train,
+                        validation_split=validation_split,
+                        shuffle=False,
+                        batch_size=batch_size,
+                        epochs=epochs,
+                        callbacks = [es],
+                        verbose = 0)
+    return model, history
 
 
 def init_baseline_yesterday():
@@ -55,12 +84,23 @@ def init_baseline_mean():
 
     return model
 
+
+def init_baseline_keras():
+
+    model = models.Sequential()
+    # a layer to take the last value of the sequence and output it
+    model.add(layers.Lambda(lambda x: x[:,-25:-1,0,None]))                      # all sequences, last day, 1 feature (pv_power)
+
+
+    adam = optimizers.Adam(learning_rate=0.02)
+    model.compile(loss='mse', optimizer=adam, metrics=["mae"])
+
+    return model
+
+
+
 # function models
 # =============================================================================
-
-
-
-
 
 def model_yesterday(X: pd.DataFrame, input_date: str) -> pd.DataFrame:
     """
