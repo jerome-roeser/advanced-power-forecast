@@ -6,7 +6,7 @@ with open("requirements.txt") as f:
 requirements = [x.strip() for x in content if "git+" not in x]
 
 setup(name='advanced-power-forecast',
-      version="0.0.1",
+      version="0.2",
       description="Team project",
       license="MIT",
       #author="The Team",

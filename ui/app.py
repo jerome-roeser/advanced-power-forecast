@@ -16,7 +16,7 @@ import matplotlib.dates as dates
 
 '''
 # Advanced Power Prediction
-(v0.1)
+(v0.2)
 '''
 
 ### Sidebar ====================================================================
