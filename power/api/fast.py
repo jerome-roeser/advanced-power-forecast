@@ -1,7 +1,7 @@
 import pandas as pd
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from power.ml_ops.data import get_data_with_cache
+from power.ml_ops.data import get_data_with_cache, get_stats_table
 from power.ml_ops.registry import load_model
 
 from pathlib import Path
@@ -14,8 +14,22 @@ from power.params import *
 
 
 app = FastAPI()
+
+# Allowing all middleware is optional, but good practice for dev purposes
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Allows all origins
+    allow_credentials=True,
+    allow_methods=["*"],  # Allows all methods
+    allow_headers=["*"],  # Allows all headers
+)
+
+### app states =================================================================
+
+# model
 app.state.model = load_model()
 
+# data (should be replaced with preprocced data)
 data_processed_cache_path = Path(LOCAL_DATA_PATH).joinpath("processed", f"processed_pv.csv")
 query = f"""
     SELECT *
@@ -29,14 +43,55 @@ app.state.data_pv_clean = get_data_with_cache(
     data_has_header=True
 )
 
-# Allowing all middleware is optional, but good practice for dev purposes
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],  # Allows all origins
-    allow_credentials=True,
-    allow_methods=["*"],  # Allows all methods
-    allow_headers=["*"],  # Allows all headers
-)
+### playground =================================================================
+
+def postprocess(
+  today: str,
+  preprocessed_df: pd.DataFrame,
+  stats_df: pd.DataFrame,
+  pred_df: pd.DataFrame,
+) -> pd.DataFrame:
+  """
+  Create a df that contains all information necessary for the plot in streamlit.
+  Input:
+    -
+  Output:
+    -
+  """
+  # define time period (3 days) for plotting
+  today_timestamp = pd.Timestamp(today, tz='UTC')
+  window_df= pd.date_range(
+            start=today_timestamp - pd.Timedelta(days=2),
+            end=  today_timestamp + pd.Timedelta(days=1),
+            freq=pd.Timedelta(hours=1)).to_frame(index=False, name='utc_time')
+
+  # create df with the preprocessed data in the time window
+  plot_df = pd.merge(window_df, preprocessed_df, on='utc_time', how='inner')
+
+  # add statistics in the time window
+  plot_df['hour_of_year'] = plot_df.utc_time.\
+                           apply(lambda x: x.strftime("%m%d%H"))
+  stats_df.columns = stats_df.columns.droplevel(level=0)
+  plot_df = pd.merge(plot_df, stats_df, on='hour_of_year', how='inner')
+
+  # add prediction for day-ahead in time window
+  plot_df = pd.merge(plot_df, pred_df, on='utc_time', how='left')
+
+  return plot_df
+
+### test call
+today = '2000-05-15'
+preprocessed_df = app.state.data_pv_clean
+stats_df = get_stats_table(app.state.data_pv_clean, capacity=False)
+# dummy
+pred_df = app.state.data_pv_clean[['utc_time','electricity']]
+# result
+plot_df = postprocess(today, preprocessed_df, stats_df, pred_df)
+print(plot_df.head())
+
+
+### app end points =============================================================
+
 
 @app.get("/extract_data")
 def extract_pv_data(input_date: str, n_days=10, power_source='pv'):
