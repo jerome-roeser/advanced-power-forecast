@@ -43,7 +43,8 @@ location = locations.radio("Locations", ["Berlin - Tempelhof", "Berlin - Tegel",
 
 
 # make api call
-base_url = "http://127.0.0.1:8000"
+#base_url = "http://127.0.0.1:8000"
+base_url = "https://powerforecast-v45amkjaba-ew.a.run.app"
 endpoint_model = "/predict/previous_value"
 endpoint_data = "/extract_data"
 url_model = f"{base_url}{endpoint_model}"
@@ -56,8 +57,10 @@ params ={
 response_model = requests.get(url_model, params=params).json()
 model_df = pd.DataFrame(response_model)
 
-response_data = requests.get(url_data, params=params).json()
-data_df = pd.DataFrame(response_data)
+## this end point gives an error:
+#response_data = requests.get(url_data, params=params).json()
+#breakpoint()
+#data_df = pd.DataFrame(response_data)
 
 
 
