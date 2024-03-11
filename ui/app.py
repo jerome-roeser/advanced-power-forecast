@@ -121,6 +121,9 @@ ax.annotate('order book closed',(0.51,0.77), xycoords='subfigure fraction')
 
 ax.legend();
 
+##
+st.pyplot(fig)
+
 
 
 

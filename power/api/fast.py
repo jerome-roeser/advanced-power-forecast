@@ -3,6 +3,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from power.ml_ops.data import get_data_with_cache, get_stats_table
 from power.ml_ops.registry import load_model
+from power.interface.main import pred #, postprocess
 
 from pathlib import Path
 from power.params import *
@@ -84,6 +85,8 @@ def postprocess(
   plot_df = pd.merge(plot_df, stats_df, on='hour_of_year', how='inner')
 
   # add prediction for day-ahead in time window
+  input_pred = f"{today} 12:00:00" # '2013-05-08 12:00:00'
+  pred_df = pred(input_pred)
   plot_df = pd.merge(plot_df, pred_df, on='utc_time', how='left')
 
   return plot_df
