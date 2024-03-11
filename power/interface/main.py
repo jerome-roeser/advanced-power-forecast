@@ -147,8 +147,8 @@ def train(
 
 
 def evaluate(
-        min_date:str = '2014-01-01',
-        max_date:str = '2015-01-01',
+        min_date = '2020-01-01 00:00:00',
+        max_date = '2022-12-29 23:00:00',
         stage: str = "Production"
     ) -> float:
     """
