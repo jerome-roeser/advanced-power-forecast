@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+import tensorflow as tf
 
 from pathlib import Path
 from colorama import Fore, Style
@@ -59,7 +60,7 @@ def preprocess(min_date = '1980-01-01 00:00:00',
 
 def train(
         min_date = '1980-01-01 00:00:00',
-        max_date = '2019-12-30 23:00:00',
+        max_date = '2019-12-31 23:00:00',
         split_ratio: float = 0.02, # 0.02 represents ~ 1 month of validation data on a 2009-2015 train set
         learning_rate=0.02,
         batch_size = 32,
@@ -103,16 +104,15 @@ def train(
         return None
 
     # Split the data into training and testing sets
-    train = data_processed[data_processed['utc_time'] < '2020-01-01']
-    test = data_processed[data_processed['utc_time'] >= '2020-01-01']
+    train = data_processed[data_processed['utc_time'] < max_date]
 
     train = train[['power']]
-    test = test[['power']]
 
     X_train, y_train = get_X_y_seq(train,
                                    number_of_sequences=10_000,
                                    input_length=48,
-                                   output_length=24)
+                                   output_length=24,
+                                   gap_hours=12)
 
 
     # Train model using `model.py`
@@ -134,7 +134,7 @@ def train(
 
     params = dict(
         context="train",
-        training_set_size='40 years worth of data',
+        training_set_size=f'Training data from {min_date} to {max_date}',
         row_count=len(X_train),
     )
 
@@ -204,7 +204,9 @@ def evaluate(
     return mae
 
 
-def pred(X_pred:str = '2013-05-08 12:00:00') -> np.ndarray:
+def pred(input_pred:str = '2013-05-08 12:00:00',
+         min_date = '2020-01-01 00:00:00',
+         max_date = '2022-12-29 23:00:00',) -> np.ndarray:
     """
     Make a prediction using the latest trained model
     """
@@ -218,27 +220,42 @@ def pred(X_pred:str = '2013-05-08 12:00:00') -> np.ndarray:
     # input_date = X_test[time_difference_hours-47: time_difference_hours+1]
 
 
+    query = f"""
+        SELECT *
+        FROM {GCP_PROJECT}.{BQ_DATASET}.processed_pv
+        ORDER BY utc_time
+    """
 
-    # if X_pred is None:
-    #     X_pred = pd.DataFrame(dict(
-    #     pickup_datetime=[pd.Timestamp("2013-07-06 17:18:00", tz='UTC')],
-    #     pickup_longitude=[-73.950655],
-    #     pickup_latitude=[40.783282],
-    #     dropoff_longitude=[-73.984365],
-    #     dropoff_latitude=[40.769802],
-    #     passenger_count=[1],
-    # ))
+    data_processed_cache_path = Path(LOCAL_DATA_PATH).joinpath("processed", f"processed_pv.csv")
+    data_processed = get_data_with_cache(
+        gcp_project=GCP_PROJECT,
+        query=query,
+        cache_path=data_processed_cache_path,
+        data_has_header=True
+    )
+
+    X_pred = data_processed[data_processed['utc_time'] < input_pred][-48:]
+
+    X_pred= X_pred.rename(columns={'electricity': 'power'})
+
+    X_pred = X_pred[['power']]
+
+    X_pred = X_pred.to_numpy()
+
+    X_pred_tf = tf.convert_to_tensor(X_pred)
+
+    X_pred_tf = tf.expand_dims(X_pred_tf, axis=0)
+
 
     model = load_model()
     assert model is not None
 
     # X_processed = preprocess_features(X_pred)
-    # y_pred = model.predict(X_processed)
+    y_pred = model.predict(X_pred_tf)
 
-    # print("\n✅ prediction done: ", y_pred, y_pred.shape, "\n")
-    print("\n✅ prediction done: \n")
-    return model # change it back! to return y_pred
-    # return y_pred
+    print("\n✅ prediction done: ", y_pred, y_pred.shape, "\n")
+
+    return y_pred
 
 
 if __name__ == '__main__':
