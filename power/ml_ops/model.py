@@ -30,13 +30,14 @@ def initialize_model(X_train, y_train, n_unit=24):
 
 def compile_model(model, learning_rate=0.02):
 
-    def r_squared(y_true, y_pred):
-        ss_res = K.sum(K.square(y_true - y_pred))
-        ss_tot = K.sum(K.square(y_true - K.mean(y_true)))
-        return (1 - ss_res/(ss_tot + K.epsilon()))
+    # def r_squared(y_true, y_pred):
+    #     ss_res = K.sum(K.square(y_true - y_pred))
+    #     ss_tot = K.sum(K.square(y_true - K.mean(y_true)))
+    #     return (1 - ss_res/(ss_tot + K.epsilon()))
 
     adam = optimizers.Adam(learning_rate=learning_rate)
-    model.compile(loss='mse', optimizer=adam, metrics=['mae', r_squared])
+    # model.compile(loss='mse', optimizer=adam, metrics=['mae', r_squared])
+    model.compile(loss='mse', optimizer=adam, metrics=['mae'])
 
     return model
 

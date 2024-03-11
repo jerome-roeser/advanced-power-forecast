@@ -10,16 +10,16 @@ reinstall_package:
 	@pip install -e .
 
 run_preprocess:
-	python -c 'from taxifare.interface.main import preprocess; preprocess()'
+	python -c 'from power.interface.main import preprocess; preprocess()'
 
 run_train:
-	python -c 'from taxifare.interface.main import train; train()'
+	python -c 'from power.interface.main import train; train()'
 
 run_pred:
-	python -c 'from taxifare.interface.main import pred; pred()'
+	python -c 'from power.interface.main import pred; pred()'
 
 run_evaluate:
-	python -c 'from taxifare.interface.main import evaluate; evaluate()'
+	python -c 'from power.interface.main import evaluate; evaluate()'
 
 run_all: run_preprocess run_train run_pred run_evaluate
 
