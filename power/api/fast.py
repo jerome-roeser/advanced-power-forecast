@@ -88,21 +88,21 @@ def postprocess(
 
   return plot_df
 
-### test call
-today = '2000-05-15'
-preprocessed_df = app.state.data_pv_clean
-stats_df = get_stats_table(app.state.data_pv_clean, capacity=False)
-# dummy
-pred_df = app.state.data_pv_clean[['utc_time','electricity']]
-pred_df = pred_df.rename(columns={'electricity':'pred'})
-# result
-plot_df = postprocess(today, preprocessed_df, stats_df, pred_df)
+# ### test call
+# today = '2000-05-15'
+# preprocessed_df = app.state.data_pv_clean
+# stats_df = get_stats_table(app.state.data_pv_clean, capacity=False)
+# # dummy
+# pred_df = app.state.data_pv_clean[['utc_time','electricity']]
+# pred_df = pred_df.rename(columns={'electricity':'pred'})
+# # result
+# plot_df = postprocess(today, preprocessed_df, stats_df, pred_df)
 
-print('test postprocess:')
-print(plot_df.head(3))
-print('==============================')
-plot_dict = plot_df.to_dict()
-print(plot_dict)
+# print('test postprocess:')
+# print(plot_df.head(3))
+# print('==============================')
+# plot_dict = plot_df.to_dict()
+# print(plot_dict)
 
 ### app end points =============================================================
 
