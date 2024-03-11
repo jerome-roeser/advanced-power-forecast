@@ -135,3 +135,31 @@ def select_years(df: pd.DataFrame, start=1980, end=1980)-> pd.DataFrame:
 
     return years_df
 
+
+def get_stats_table(
+  years_df: pd.DataFrame,
+  capacity: False) -> pd.DataFrame:
+  """
+  Creates a table with statistics for electricity and optional capacity factor
+  for every hour of the year (8784).
+  Input:
+    - Cleaned df that contains at least electricity
+    as column. The df should span several years, because every
+    year is one sample for the statictics.
+    - Optional flag for capacity factor
+  Output:
+    - df with 8784 hours of the years (including leap years) as rows. The df has
+    multilevel index because statistics are returned for electricity and
+    capacity factor.
+  """
+  years_df['hour_of_year'] = years_df.utc_time.\
+                           apply(lambda x: x.strftime("%m%d%H"))
+  if capacity:
+    stats_df = years_df[['hour_of_year', 'electricity', 'cap_fac']]\
+                    .groupby(['hour_of_year']).agg(['mean','median','std',
+                                                    'skew','min','max','count'])
+  else:
+    stats_df = years_df[['hour_of_year', 'electricity']]\
+                    .groupby(['hour_of_year']).agg(['mean','median','std',
+                                                    'skew','min','max','count'])
+  return stats_df
