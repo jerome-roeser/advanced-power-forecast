@@ -152,7 +152,7 @@ def get_stats_table(
     multilevel index because statistics are returned for electricity and
     capacity factor.
   """
-  years_df['hour_of_year'] = data_processed_df.utc_time.\
+  years_df['hour_of_year'] = years_df.utc_time.\
                            apply(lambda x: x.strftime("%m%d%H"))
   if capacity:
     stats_df = years_df[['hour_of_year', 'electricity', 'cap_fac']]\

@@ -29,19 +29,27 @@ app.add_middleware(
 # model
 app.state.model = load_model()
 
-# data (should be replaced with preprocced data)
+# get preprocessed data like in main.train
 data_processed_cache_path = Path(LOCAL_DATA_PATH).joinpath("processed", f"processed_pv.csv")
 query = f"""
     SELECT *
     FROM {GCP_PROJECT}.{BQ_DATASET}.processed_pv
     ORDER BY utc_time
 """
-app.state.data_pv_clean = get_data_with_cache(
+
+data_processed = get_data_with_cache(
     gcp_project=GCP_PROJECT,
     query=query,
     cache_path=data_processed_cache_path,
     data_has_header=True
 )
+
+# the model uses power as feature -> fix that in raw data
+#data_processed = data_processed.rename(columns={'electricity': 'power'})
+# the processed data from bq needs to be converted to datetime object
+data_processed.utc_time = pd.to_datetime(data_processed.utc_time,utc=True)
+# rename
+app.state.data_pv_clean = data_processed
 
 ### playground =================================================================
 
@@ -66,6 +74,7 @@ def postprocess(
             freq=pd.Timedelta(hours=1)).to_frame(index=False, name='utc_time')
 
   # create df with the preprocessed data in the time window
+
   plot_df = pd.merge(window_df, preprocessed_df, on='utc_time', how='inner')
 
   # add statistics in the time window
@@ -85,12 +94,32 @@ preprocessed_df = app.state.data_pv_clean
 stats_df = get_stats_table(app.state.data_pv_clean, capacity=False)
 # dummy
 pred_df = app.state.data_pv_clean[['utc_time','electricity']]
+pred_df = pred_df.rename(columns={'electricity':'pred'})
 # result
 plot_df = postprocess(today, preprocessed_df, stats_df, pred_df)
-print(plot_df.head())
 
+print('test postprocess:')
+print(plot_df.head(3))
+print('==============================')
+plot_dict = plot_df.to_dict()
+print(plot_dict)
 
 ### app end points =============================================================
+
+@app.get("/visualisation")
+def visualisation(input_date: str, power_source='pv'):
+  today = input_date
+  preprocessed_df = app.state.data_pv_clean
+  stats_df = get_stats_table(app.state.data_pv_clean, capacity=False)
+  # dummy (use predict function instead)
+  pred_df = app.state.data_pv_clean[['utc_time','electricity']]
+  pred_df = pred_df.rename(columns={'electricity':'pred'})
+  #
+  plot_df = postprocess(today, preprocessed_df, stats_df, pred_df)
+  # as dict for data transfer from backend to frontend
+  plot_dict = plot_df.to_dict()
+
+  return plot_dict
 
 
 @app.get("/extract_data")
