@@ -69,7 +69,7 @@ def get_X_y_strides(fold: pd.DataFrame, input_length: int, output_length: int, s
     - returns a list of sequences, each as a 2D-array time series
     '''
 
-    TARGET = 'power'
+    TARGET = 'electricity'
     X, y = [], []
 
     for i in range(0, len(fold), sequence_stride):
@@ -97,7 +97,7 @@ def get_Xi_yi(
     - with the starting point of the sequence being chosen at random
     - TARGET is the variable(s) we want to predict (name of the column(s))
     '''
-    TARGET = 'power'
+    TARGET = 'electricity'
     first_possible_start = 0
     last_possible_start = len(fold) - (input_length + gap_hours + output_length) + 1
 

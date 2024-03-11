@@ -57,7 +57,6 @@ def preprocess(min_date = '1980-01-01 00:00:00',
     print("✅ preprocess() done \n")
 
 
-
 def train(
         min_date = '1980-01-01 00:00:00',
         max_date = '2019-12-31 23:00:00',
@@ -94,8 +93,6 @@ def train(
         data_has_header=True
     )
 
-    # the model uses power as feature -> fix that in raw data
-    data_processed = data_processed.rename(columns={'electricity': 'power'})
     # the processed data from bq needs to be converted to datetime object
     data_processed.utc_time = pd.to_datetime(data_processed.utc_time,utc=True)
 
@@ -106,7 +103,7 @@ def train(
     # Split the data into training and testing sets
     train = data_processed[data_processed['utc_time'] < max_date]
 
-    train = train[['power']]
+    train = train[['electricity']]
 
     X_train, y_train = get_X_y_seq(train,
                                    number_of_sequences=10_000,
@@ -206,19 +203,12 @@ def evaluate(
 
 def pred(input_pred:str = '2013-05-08 12:00:00',
          min_date = '2020-01-01 00:00:00',
-         max_date = '2022-12-29 23:00:00',) -> np.ndarray:
+         max_date = '2022-12-29 23:00:00') -> pd.DataFrame:
     """
     Make a prediction using the latest trained model
     """
 
     print("\n⭐️ Use case: predict")
-
-    # X_pred = datetime.strptime(X_pred, '%Y-%m-%d %H:%M:%S')
-    # reference_datetime = datetime.strptime("1980-01-01 00:00:00", '%Y-%m-%d %H:%M:%S')
-    # time_difference = X_pred - reference_datetime
-    # time_difference_hours = time_difference.total_seconds() / 3600
-    # input_date = X_test[time_difference_hours-47: time_difference_hours+1]
-
 
     query = f"""
         SELECT *
@@ -234,28 +224,29 @@ def pred(input_pred:str = '2013-05-08 12:00:00',
         data_has_header=True
     )
 
+    # X_pred should be the 48 hours before the input date
     X_pred = data_processed[data_processed['utc_time'] < input_pred][-48:]
 
-    X_pred= X_pred.rename(columns={'electricity': 'power'})
+    # we have to rename columns because model is using 'power' as coulumns name
+    # X_pred= X_pred.rename(columns={'electricity': 'power'})
 
-    X_pred = X_pred[['power']]
-
-    X_pred = X_pred.to_numpy()
-
+    # convert X_pred to a tensorflow object
+    X_pred = X_pred[['electricity']].to_numpy()
     X_pred_tf = tf.convert_to_tensor(X_pred)
-
     X_pred_tf = tf.expand_dims(X_pred_tf, axis=0)
-
 
     model = load_model()
     assert model is not None
 
-    # X_processed = preprocess_features(X_pred)
     y_pred = model.predict(X_pred_tf)
+
+    # y_pred dates shoud be the 24hours after a 12 hour gap
+    y_pred_df = data_processed[data_processed['utc_time'] > input_pred][12:36]
+    y_pred_df['electricity'] = y_pred[0]
 
     print("\n✅ prediction done: ", y_pred, y_pred.shape, "\n")
 
-    return y_pred
+    return y_pred_df
 
 
 if __name__ == '__main__':
