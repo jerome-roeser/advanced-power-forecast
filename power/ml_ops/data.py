@@ -10,7 +10,7 @@ from power.params import *
 
 from google.oauth2 import service_account
 
-credentials = service_account.Credentials.from_service_account_file(GCP_AUTHENTIFICATION, scopes=["https://www.googleapis.com/auth/cloud-platform"])
+# credentials = service_account.Credentials.from_service_account_file(GCP_AUTHENTIFICATION, scopes=["https://www.googleapis.com/auth/cloud-platform"])
 
 
 
@@ -60,7 +60,7 @@ def get_data_with_cache(
         df = pd.read_csv(cache_path, header='infer' if data_has_header else None)
     else:
         print(Fore.BLUE + "\nLoad data from BigQuery server..." + Style.RESET_ALL)
-        client = bigquery.Client(project=gcp_project, credentials=credentials)
+        client = bigquery.Client(project=gcp_project) #, credentials=credentials)
         query_job = client.query(query)
         result = query_job.result()
         df = result.to_dataframe()

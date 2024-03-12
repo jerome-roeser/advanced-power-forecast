@@ -8,7 +8,7 @@ RUN pip install -r requirements.txt
 
 # Then only, install power
 COPY power power
-COPY le-wagon-data-411310-7c498969c3b9.json le-wagon-data-411310-7c498969c3b9.json
+# COPY le-wagon-data-411310-7c498969c3b9.json le-wagon-data-411310-7c498969c3b9.json
 COPY setup.py setup.py
 RUN pip install .
 
