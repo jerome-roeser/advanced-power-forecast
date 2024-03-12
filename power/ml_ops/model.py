@@ -61,6 +61,33 @@ def train_model(model,
     return model, history
 
 
+def evaluate_model(model,
+                    X,
+                    y,
+                    batch_size=32
+                    ):
+    """ evaluate trained model """
+
+    if model is None:
+        print(f"\n❌ No model to evaluate")
+        return None
+
+    metrics = model.evaluate(
+            x=X,
+            y=y,
+            batch_size=batch_size,
+            verbose=0,
+            return_dict=True
+        )
+    
+    loss = metrics["loss"]
+    mae = metrics["mae"]
+
+    print(f"✅ Model evaluated, MAE: {round(mae, 2)}")
+
+    return metrics
+
+
 def init_baseline_yesterday():
 
     ## architecture

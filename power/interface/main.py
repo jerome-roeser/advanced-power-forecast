@@ -10,7 +10,7 @@ from datetime import datetime
 
 from power.params import *
 from power.ml_ops.data import get_data_with_cache, load_data_to_bq, clean_pv_data
-from power.ml_ops.model import initialize_model, compile_model, train_model
+from power.ml_ops.model import initialize_model, compile_model, train_model, evaluate_model
 from power.ml_ops.registry import load_model, save_model, save_results
 from power.ml_ops.cross_val import get_X_y_seq
 
@@ -147,8 +147,6 @@ def train(
 
 
 def evaluate(
-        min_date = '2020-01-01 00:00:00',
-        max_date = '2022-12-29 23:00:00',
         stage: str = "Production"
     ) -> float:
     """
@@ -180,17 +178,28 @@ def evaluate(
         print("❌ No data to evaluate on")
         return None
 
-    data_processed = data_processed.to_numpy()
+    # y is a sequence of 24 observations after a 12 observation gap -> 36 rows
+    # X is a sequence of 48 observations before Gap & y
+    X_new = data_processed[(-48 - 36): -36]
+    y_new = data_processed[-24:]
 
-    X_new = data_processed[:, :-1]
-    y_new = data_processed[:, -1]
+    # convert X_pred to a tensorflow object
+    X_new = X_new[['electricity']].to_numpy()
+    X_new_tf = tf.convert_to_tensor(X_new)
+    X_new_tf = tf.expand_dims(X_new_tf, axis=0)
 
-    metrics_dict = evaluate_model(model=model, X=X_new, y=y_new)
+    # convert X_pred to a tensorflow object
+    y_new = y_new[['electricity']].to_numpy()
+    y_new_tf = tf.convert_to_tensor(y_new)
+    y_new_tf = tf.expand_dims(y_new_tf, axis=0)
+
+
+    metrics_dict = evaluate_model(model=model, X=X_new_tf, y=y_new_tf)
     mae = metrics_dict["mae"]
 
     params = dict(
         context="evaluate", # Package behavior
-        training_set_size=DATA_SIZE,
+        training_set_size='"40 years"',
         row_count=len(X_new)
     )
 
@@ -274,5 +283,5 @@ if __name__ == '__main__':
                max_date = '2022-12-31 23:00:00')
     train(min_date = '1980-01-01 00:00:00',
           max_date = '2019-12-30 23:00:00')
-    #evaluate(min_date='2009-01-01', max_date='2015-01-01')
+    evaluate()
     pred('2013-05-08 12:00:00')
