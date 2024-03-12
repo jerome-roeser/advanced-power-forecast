@@ -47,10 +47,12 @@ def train_model(model,
                 validation_split = 0.3,
                 batch_size = 32,
                 epochs = 50):
+
     es = EarlyStopping(monitor = "val_mae",
                        mode = "min",
                        patience = 5,
                        restore_best_weights = True)
+
     history = model.fit(X_train, y_train,
                         validation_split=validation_split,
                         shuffle=False,
@@ -79,7 +81,7 @@ def evaluate_model(model,
             verbose=0,
             return_dict=True
         )
-    
+
     loss = metrics["loss"]
     mae = metrics["mae"]
 

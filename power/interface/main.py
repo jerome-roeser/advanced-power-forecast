@@ -199,7 +199,7 @@ def evaluate(
 
     params = dict(
         context="evaluate", # Package behavior
-        training_set_size='"40 years"',
+        training_set_size="40 years",
         row_count=len(X_new)
     )
 
