@@ -252,6 +252,15 @@ def pred(input_pred:str = '2013-05-08 12:00:00',
     y_pred_df.reset_index(drop=True, inplace=True)
     y_pred_df.utc_time = pd.to_datetime(y_pred_df.utc_time,utc=True)
 
+    # Cut-off predictions that are negative or bigger than max capacity
+    def cutoff_func(x):
+      if x < 0.0:
+        return 0
+      if x > 0.9:
+        return 0.9
+
+    y_pred_df.pred = y_pred_df.pred.apply(cutoff_func)
+
     print("\n✅ prediction done: ", y_pred, y_pred.shape, "\n")
 
     return y_pred_df
