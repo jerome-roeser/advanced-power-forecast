@@ -14,5 +14,9 @@ GAR_IMAGE = os.environ.get("GAR_IMAGE")
 GAR_MEMORY = os.environ.get("GAR_MEMORY")
 
 ##################  CONSTANTS  #####################
-LOCAL_DATA_PATH = os.path.join(os.path.expanduser('~'), ".lewagon", "mlops", "data")
-LOCAL_REGISTRY_PATH =  os.path.join(os.path.expanduser('~'), ".lewagon", "mlops", "training_outputs")
+absolute_path = os.path.dirname(os.path.abspath(__file__))
+
+GCP_AUTHENTIFICATION = os.path.join(absolute_path, "..", os.environ.get("GCP_AUTHENTIFICATION"))
+
+LOCAL_DATA_PATH = os.path.join(absolute_path, ".lewagon", "mlops", "data")
+LOCAL_REGISTRY_PATH =  os.path.join(absolute_path, ".lewagon", "mlops", "training_outputs")

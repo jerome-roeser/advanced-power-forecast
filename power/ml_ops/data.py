@@ -8,6 +8,12 @@ from pathlib import Path
 
 from power.params import *
 
+from google.oauth2 import service_account
+
+credentials = service_account.Credentials.from_service_account_file(GCP_AUTHENTIFICATION, scopes=["https://www.googleapis.com/auth/cloud-platform"])
+
+
+
 
 def clean_pv_data(pv_df: pd.DataFrame) ->pd.DataFrame:
     """
@@ -54,15 +60,20 @@ def get_data_with_cache(
         df = pd.read_csv(cache_path, header='infer' if data_has_header else None)
     else:
         print(Fore.BLUE + "\nLoad data from BigQuery server..." + Style.RESET_ALL)
-        client = bigquery.Client(project=gcp_project)
+        client = bigquery.Client(project=gcp_project, credentials=credentials)
         query_job = client.query(query)
         result = query_job.result()
         df = result.to_dataframe()
 
         # Store as CSV if the BQ query returned at least one valid line
+        print(f"cache_path: {cache_path}")
+        print(f"header: {data_has_header}")
+        print(f"index: {False}")
         if df.shape[0] > 1:
             df.to_csv(cache_path, header=data_has_header, index=False)
-
+    print(f"cache_path: {cache_path}")
+    print(f"header: {data_has_header}")
+    print(f"index: {False}")
     print(f"✅ Data loaded, with shape {df.shape}")
 
     return df

@@ -30,10 +30,10 @@ run_api:
 ################### DATA SOURCES ACTIONS ################
 
 # Data sources: targets for monthly data imports
-ML_DIR=~/.lewagon/mlops
+ML_DIR= power/.lewagon/mlops
 
 show_sources_all:
-	-ls -laR ~/.lewagon/mlops/data
+	-ls -laR power/.lewagon/mlops/data
 	-bq ls ${BQ_DATASET}
 	-bq show ${BQ_DATASET}.processed_pv
 	-bq show ${BQ_DATASET}.processed_wind
@@ -41,13 +41,13 @@ show_sources_all:
 
 reset_local_files:
 	rm -rf ${ML_DIR}
-	mkdir -p ~/.lewagon/mlops/data/
-	mkdir ~/.lewagon/mlops/data/raw
-	mkdir ~/.lewagon/mlops/data/processed
-	mkdir ~/.lewagon/mlops/training_outputs
-	mkdir ~/.lewagon/mlops/training_outputs/metrics
-	mkdir ~/.lewagon/mlops/training_outputs/models
-	mkdir ~/.lewagon/mlops/training_outputs/params
+	mkdir -p power/.lewagon/mlops/data/
+	mkdir power/.lewagon/mlops/data/raw
+	mkdir power/.lewagon/mlops/data/processed
+	mkdir power/.lewagon/mlops/training_outputs
+	mkdir power/.lewagon/mlops/training_outputs/metrics
+	mkdir power/.lewagon/mlops/training_outputs/models
+	mkdir power/.lewagon/mlops/training_outputs/params
 
 reset_bq_files:
 	-bq rm --project_id ${GCP_PROJECT} ${BQ_DATASET}.processed_pv

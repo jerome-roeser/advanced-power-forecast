@@ -31,7 +31,7 @@ app.add_middleware(
 # model
 app.state.model = load_model()
 
-# get preprocessed data like in main.train
+# # get preprocessed data like in main.train
 data_processed_cache_path = Path(LOCAL_DATA_PATH).joinpath("processed", f"processed_pv.csv")
 query = f"""
     SELECT *
@@ -45,6 +45,10 @@ data_processed = get_data_with_cache(
     cache_path=data_processed_cache_path,
     data_has_header=True
 )
+
+
+################  USEE LOCAL file FOR NOW ##########################
+# data_processed = pd.read_csv('power/api/data_backup/processed_pv.csv')
 
 # the model uses power as feature -> fix that in raw data
 #data_processed = data_processed.rename(columns={'electricity': 'power'})

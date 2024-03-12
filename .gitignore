@@ -2,6 +2,10 @@ raw_data/
 power/__pycache__/
 power/ml_ops/__pycache__/
 **/__pycache__/
+le-wagon-data-411310-7c498969c3b9.json
+20240310-115742.h5
+power/.lewagon/
+.env.yaml
 
 # OS generated files #
 ######################
