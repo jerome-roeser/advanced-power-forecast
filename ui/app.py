@@ -72,8 +72,7 @@ plot_df.utc_time = pd.to_datetime(plot_df.utc_time,utc=True)
 today_dt = pd.Timestamp(today_date, tz='UTC')
 time = plot_df.utc_time.values
 
-#sep_future = today_dt
-#sep_past = today_dt - pd.Timedelta(days=1)
+
 sep_future = today_dt + pd.Timedelta(days=1)
 sep_past = today_dt
 
