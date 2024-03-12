@@ -242,7 +242,27 @@ def pred(input_pred:str = '2013-05-08 12:00:00',
 
     # y_pred dates shoud be the 24hours after a 12 hour gap
     y_pred_df = data_processed[data_processed['utc_time'] > input_pred][12:36]
-    y_pred_df['electricity'] = y_pred[0]
+    y_pred_df['pred'] = y_pred[0]
+
+    # y_pred_df should have only two columns: 'utc_time', 'pred'; utc_time
+    # should be datetime object
+    # # please improve code above!
+    y_pred_df = y_pred_df.drop(columns='local_time')
+    y_pred_df = y_pred_df.drop(columns='electricity')
+    y_pred_df.reset_index(drop=True, inplace=True)
+    y_pred_df.utc_time = pd.to_datetime(y_pred_df.utc_time,utc=True)
+
+    # Cut-off predictions that are negative or bigger than max capacity
+    def cutoff_func(x):
+      if x < 0.0:
+        return 0
+      if x > 0.9:
+        return 0.9
+      return x
+
+    y_pred_df.pred = y_pred_df.pred.apply(cutoff_func)
+
+    print(y_pred_df.pred)
 
     print("\n✅ prediction done: ", y_pred, y_pred.shape, "\n")
 

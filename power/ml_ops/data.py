@@ -160,7 +160,7 @@ def get_stats_table(
   years_df['hour_of_year'] = years_df.utc_time.\
                            apply(lambda x: x.strftime("%m%d%H"))
   if capacity:
-    stats_df = years_df[['hour_of_year', 'electricity', 'cap_fac']]\
+    stats_df = years_df[['hour_of_year', 'cap_fac']]\
                     .groupby(['hour_of_year']).agg(['mean','median','std',
                                                     'skew','min','max','count'])
   else:
@@ -168,3 +168,45 @@ def get_stats_table(
                     .groupby(['hour_of_year']).agg(['mean','median','std',
                                                     'skew','min','max','count'])
   return stats_df
+
+
+def postprocess(
+  today: str,
+  preprocessed_df: pd.DataFrame,
+  stats_df: pd.DataFrame,
+  pred_df: pd.DataFrame,
+) -> pd.DataFrame:
+  """
+  Create a df that contains all information necessary for the plot in streamlit.
+  Accumulate all data for a specific time window defined by today.
+  Input:
+    - today: User input from streamlit; e.g. '2000-05-15'
+    - preprocessed_df: df with all years that can be selected in streamlit
+      (2000-2022)
+    - stats_df: provided by get_stats_table()
+    - pred_df: df from pred(), should contain two columns 'utc_time' and 'pred'
+  Output:
+    - plot_df with columns: utc_time, local_time, electricity, hour_of_year,
+      mean, median, std, skew, min, max, count, pred
+    - plot_df contains NaN-values! You have to replace them for api
+  """
+  # define time period (3 days) for plotting
+  today_timestamp = pd.Timestamp(today, tz='UTC')
+  window_df= pd.date_range(
+            start=today_timestamp - pd.Timedelta(days=1),
+            end=  today_timestamp + pd.Timedelta(days=2) - pd.Timedelta(hours=1),
+            freq=pd.Timedelta(hours=1)).to_frame(index=False, name='utc_time')
+
+  # create df with the preprocessed data in the time window
+  plot_df = pd.merge(window_df, preprocessed_df, on='utc_time', how='inner')
+
+  # add statistics in the time window
+  plot_df['hour_of_year'] = plot_df.utc_time.\
+                           apply(lambda x: x.strftime("%m%d%H"))
+  stats_df.columns = stats_df.columns.droplevel(level=0)
+  plot_df = pd.merge(plot_df, stats_df, on='hour_of_year', how='inner')
+
+  # add prediction for day-ahead in time window
+  plot_df = pd.merge(plot_df, pred_df, on='utc_time', how='left')
+
+  return plot_df
