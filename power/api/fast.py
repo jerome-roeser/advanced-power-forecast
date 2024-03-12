@@ -1,7 +1,7 @@
 import pandas as pd
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from power.ml_ops.data import get_data_with_cache, get_stats_table
+from power.ml_ops.data import get_data_with_cache, get_stats_table, postprocess
 from power.ml_ops.registry import load_model
 from power.interface.main import pred #, postprocess
 
@@ -53,87 +53,33 @@ data_processed.utc_time = pd.to_datetime(data_processed.utc_time,utc=True)
 # rename
 app.state.data_pv_clean = data_processed
 
-### playground =================================================================
-
-def postprocess(
-  today: str,
-  preprocessed_df: pd.DataFrame,
-  stats_df: pd.DataFrame,
-  pred_df: pd.DataFrame,
-) -> pd.DataFrame:
-  """
-  Create a df that contains all information necessary for the plot in streamlit.
-  Input:
-    -
-  Output:
-    -
-  """
-  # define time period (3 days) for plotting
-  today_timestamp = pd.Timestamp(today, tz='UTC')
-  window_df= pd.date_range(
-            start=today_timestamp - pd.Timedelta(days=1),
-            end=  today_timestamp + pd.Timedelta(days=2) - pd.Timedelta(hours=1),
-            freq=pd.Timedelta(hours=1)).to_frame(index=False, name='utc_time')
-  #print('start: ', today_timestamp - pd.Timedelta(days=1))
-  #print('end: ', today_timestamp + pd.Timedelta(days=2))
-
-  # create df with the preprocessed data in the time window
-  plot_df = pd.merge(window_df, preprocessed_df, on='utc_time', how='inner')
-
-  # add statistics in the time window
-  plot_df['hour_of_year'] = plot_df.utc_time.\
-                           apply(lambda x: x.strftime("%m%d%H"))
-  stats_df.columns = stats_df.columns.droplevel(level=0)
-  plot_df = pd.merge(plot_df, stats_df, on='hour_of_year', how='inner')
-
-  # add prediction for day-ahead in time window
-  #qbreakpoint()
-  plot_df = pd.merge(plot_df, pred_df, on='utc_time', how='left')
-
-  return plot_df
-
-# ### test call
-# today = '2000-05-15'
-# preprocessed_df = app.state.data_pv_clean
-# stats_df = get_stats_table(app.state.data_pv_clean, capacity=False)
-# # dummy
-# pred_df = app.state.data_pv_clean[['utc_time','electricity']]
-# pred_df = pred_df.rename(columns={'electricity':'pred'})
-# # result
-# plot_df = postprocess(today, preprocessed_df, stats_df, pred_df)
-
-# print('test postprocess:')
-# print(plot_df.head(3))
-# print('==============================')
-# plot_dict = plot_df.to_dict()
-# print(plot_dict)
-
 ### app end points =============================================================
 
 @app.get("/visualisation")
-def visualisation(input_date: str, power_source='pv'):
+def visualisation(input_date: str, power_source='pv', capacity='false') -> None:
+  """
+  input_date corresponds to "today"
+  """
 
-  today = input_date
+  # collect input for postprocess
+  pred_df = pred( f"{input_date} 12:00:00")
   preprocessed_df = app.state.data_pv_clean
-  stats_df = get_stats_table(app.state.data_pv_clean, capacity=False)
-  # dummy (use predict function instead)
-  #pred_df = app.state.data_pv_clean[['utc_time','electricity']]
-  #pred_df = pred_df.rename(columns={'electricity':'pred'})
-  input_pred = f"{today} 12:00:00" # '2013-05-08 12:00:00'
-  pred_df = pred(input_pred)
-  pred_df = pred_df.drop(columns='local_time')
-  pred_df = pred_df.rename(columns={'electricity':'pred'})
-  pred_df.utc_time = pd.to_datetime(pred_df.utc_time,utc=True)
-  #
-  #breakpoint()
-  plot_df = postprocess(today, preprocessed_df, stats_df, pred_df)
-  # as dict for data transfer from backend to frontend
-  #breakpoint()
+  if capacity == 'true':
+    print('Capacity!')
+    preprocessed_df['cap_fac'] = preprocessed_df.electricity / 0.9 * 100 # 0.9 is max value for pv
+    stats_df = get_stats_table(preprocessed_df, capacity=True)
+    pred_df.pred = pred_df.pred / 0.9 * 100
+  else:
+    print('Electricity!')
+    stats_df = get_stats_table(preprocessed_df, capacity=False)
 
+  # get plot_df
+  plot_df = postprocess(input_date, preprocessed_df, stats_df, pred_df)
+
+  # Send as dict from backend to frontend; NaNs have to be replaced
   plot_df = plot_df.fillna(0.0)
-  #plot_df = compress(plot_df)
-
   plot_dict = plot_df.to_dict()
+
   return plot_dict
 
 
