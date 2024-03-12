@@ -258,8 +258,11 @@ def pred(input_pred:str = '2013-05-08 12:00:00',
         return 0
       if x > 0.9:
         return 0.9
+      return x
 
     y_pred_df.pred = y_pred_df.pred.apply(cutoff_func)
+
+    print(y_pred_df.pred)
 
     print("\n✅ prediction done: ", y_pred, y_pred.shape, "\n")
 
