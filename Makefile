@@ -62,3 +62,50 @@ reset_gcs_files:
 	-gsutil mb -p ${GCP_PROJECT} -l ${GCP_REGION} gs://${BUCKET_NAME}
 
 reset_all_files: reset_local_files reset_bq_files reset_gcs_files
+
+
+
+################### DOCKER COMMANDS ##########################
+
+# Edit tag (prod, 0.1, light, dev, ...)
+TAG=1.2
+
+PROJECT=${GCP_PROJECT}
+IMAGE=${GAR_IMAGE}
+REGION=${GCP_REGION}
+DOCKER_REPO_NAME=${GAR_IMAGE}
+IMAGE_URI=${REGION}-docker.pkg.dev/${PROJECT}/${DOCKER_REPO_NAME}/${IMAGE}:${TAG}
+
+# authorize docker to work with GCP
+authorize:
+	gcloud auth configure-docker ${REGION}-docker.pkg.dev
+
+# create GAR repo
+create_repo:
+	gcloud artifacts repositories create ${DOCKER_REPO_NAME} --repository-format=docker \
+--location=${REGION} --description="Repository for storing advanced power forecast images in GAR"
+
+# build and run locally - for apple silicon
+build_silicon_local:
+	docker build -t ${IMAGE} . -f Dockerfile_m1
+
+run_silicon_local:
+	docker run -e PORT=8000 -p 8080:8000 ${IMAGE}
+
+build_silicon_prod:
+	docker build --platform linux/amd64 -t ${IMAGE_URI} .
+
+# build and run locally - for other machines
+build_image:
+	docker build -t ${IMAGE_URI} .
+
+run_image:
+	docker run -e PORT=8000 -p 8080:8000 --env-file .env ${IMAGE_URI}
+
+# put in production - for all machines
+push_image:
+	docker push ${IMAGE_URI}
+
+deploy_image:
+	gcloud run deploy --image ${IMAGE_URI} --memory ${GAR_MEMORY} \
+	--region ${REGION} --env-vars-file .env.yaml
