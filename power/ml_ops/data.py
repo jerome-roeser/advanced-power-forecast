@@ -62,7 +62,7 @@ def get_data_with_cache(
         # Store as CSV if the BQ query returned at least one valid line
         if df.shape[0] > 1:
             df.to_csv(cache_path, header=data_has_header, index=False)
-    
+
     print(f"✅ Data loaded, with shape {df.shape}")
 
     return df
@@ -138,7 +138,9 @@ def select_years(df: pd.DataFrame, start=1980, end=1980)-> pd.DataFrame:
 
 def get_stats_table(
   years_df: pd.DataFrame,
-  capacity: False) -> pd.DataFrame:
+  capacity= False,
+  min_date = '2020-01-01 00:00:00',
+  max_date = '2022-12-29 23:00:00') -> pd.DataFrame:
   """
   Creates a table with statistics for electricity and optional capacity factor
   for every hour of the year (8784).
@@ -152,6 +154,7 @@ def get_stats_table(
     multilevel index because statistics are returned for electricity and
     capacity factor.
   """
+  years_df =  years_df[years_df['utc_time'] < min_date]
   years_df['hour_of_year'] = years_df.utc_time.\
                            apply(lambda x: x.strftime("%m%d%H"))
   if capacity:
