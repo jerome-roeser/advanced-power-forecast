@@ -147,6 +147,8 @@ def train(
 
 
 def evaluate(
+        min_date = '1980-01-01 00:00:00',
+        max_date = '2019-12-31 23:00:00',
         stage: str = "Production"
     ) -> float:
     """
@@ -178,29 +180,22 @@ def evaluate(
         print("❌ No data to evaluate on")
         return None
 
-    # y is a sequence of 24 observations after a 12 observation gap -> 36 rows
-    # X is a sequence of 48 observations before Gap & y
-    X_new = data_processed[(-48 - 36): -36]
-    y_new = data_processed[-24:]
+    test = data_processed[data_processed['utc_time'] >= max_date]
+    test = test[['electricity']]
 
-    # convert X_pred to a tensorflow object
-    X_new = X_new[['electricity']].to_numpy()
-    X_new_tf = tf.convert_to_tensor(X_new)
-    X_new_tf = tf.expand_dims(X_new_tf, axis=0)
-
-    # convert X_pred to a tensorflow object
-    y_new = y_new[['electricity']].to_numpy()
-    y_new_tf = tf.convert_to_tensor(y_new)
-    y_new_tf = tf.expand_dims(y_new_tf, axis=0)
+    X_test, y_test = get_X_y_seq(test,
+                                   number_of_sequences=1_000,
+                                   input_length=48,
+                                   output_length=24,
+                                   gap_hours=12)
 
 
-    metrics_dict = evaluate_model(model=model, X=X_new_tf, y=y_new_tf)
+    metrics_dict = evaluate_model(model=model, X=X_test, y=y_test)
     mae = metrics_dict["mae"]
 
     params = dict(
         context="evaluate", # Package behavior
-        training_set_size="40 years",
-        row_count=len(X_new)
+        evaluate_set_size="3 years",
     )
 
     save_results(params=params, metrics=metrics_dict)
