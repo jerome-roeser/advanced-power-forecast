@@ -150,6 +150,26 @@ def get_pv_data() -> pd.DataFrame:
     print('# data loaded')
     return df
 
+def load_raw_pv():
+    data_raw = get_pv_data()
+    assert data_raw.columns[0] == '_0-1'
+    load_data_to_bq(
+            data_raw,
+            gcp_project=GCP_PROJECT,
+            bq_dataset=BQ_DATASET,
+            table=f'raw_pv',
+            truncate=True
+        )
+
+def load_raw_forecast():
+    data_raw = get_forecast_data()
+    load_data_to_bq(
+            data_raw,
+            gcp_project=GCP_PROJECT,
+            bq_dataset=BQ_DATASET,
+            table=f'raw_weather_forecast',
+            truncate=True
+        )
 
 def get_forecast_data() -> pd.DataFrame:
     """

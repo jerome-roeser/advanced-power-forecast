@@ -9,6 +9,18 @@ reinstall_package:
 	@pip uninstall -y power || :
 	@pip install -e .
 
+load_raw_pv:
+	-bq rm --project_id ${GCP_PROJECT} ${BQ_DATASET}.raw_pv
+	-bq mk --sync --project_id ${GCP_PROJECT} --location=${BQ_REGION} ${BQ_DATASET}.raw_pv
+	python -c 'from power.ml_ops.data import load_raw_pv; load_raw_pv()'
+
+load_raw_forecast:
+	-bq rm --project_id ${GCP_PROJECT} ${BQ_DATASET}.raw_weather_forecast
+	-bq mk --sync --project_id ${GCP_PROJECT} --location=${BQ_REGION} ${BQ_DATASET}.raw_weather_forecast
+	python -c 'from power.ml_ops.data import load_raw_forecast; load_raw_forecast()'
+
+load_raw_all: load_raw_pv, load_raw_forecast
+
 run_preprocess:
 	python -c 'from power.interface.main import preprocess; preprocess()'
 
@@ -52,9 +64,11 @@ reset_local_files:
 reset_bq_files:
 	-bq rm --project_id ${GCP_PROJECT} ${BQ_DATASET}.processed_pv
 	-bq rm --project_id ${GCP_PROJECT} ${BQ_DATASET}.processed_wind
+	-bq rm --project_id ${GCP_PROJECT} ${BQ_DATASET}.processed_weather_forecast
 
 	-bq mk --sync --project_id ${GCP_PROJECT} --location=${BQ_REGION} ${BQ_DATASET}.processed_pv
 	-bq mk --sync --project_id ${GCP_PROJECT} --location=${BQ_REGION} ${BQ_DATASET}.processed_wind
+	-bq mk --sync --project_id ${GCP_PROJECT} --location=${BQ_REGION} ${BQ_DATASET}.processed_weather_forecast
 
 
 reset_gcs_files:
