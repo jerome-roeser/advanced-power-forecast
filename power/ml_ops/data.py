@@ -49,29 +49,30 @@ def clean_forecast_data(forecast_df: pd.DataFrame) -> pd.DataFrame:
     """
     df = compress(forecast_df)
 
+
     # get only 1 forecast per day and deal with uncommon UTC format
-    df['forecast dt iso'] = df['forecast dt iso'].str.replace('+0000 UTC', '')
-    df['slice dt iso'] = df['slice dt iso'].str.replace('+0000 UTC', '')
+    df['forecast_dt_iso'] = df['forecast_dt_iso'].str.replace('+0000 UTC', '')
+    df['slice_dt_iso'] = df['slice_dt_iso'].str.replace('+0000 UTC', '')
 
-    df = df[df['forecast dt iso'].str.contains('12:00:00')]
+    df = df[df['forecast_dt_iso'].str.contains('12:00:00')]
 
-    df['forecast dt iso'] = pd.to_datetime(df['forecast dt iso'])
-    df['slice dt iso'] = pd.to_datetime(df['slice dt iso'])
+    df['forecast_dt_iso'] = pd.to_datetime(df['forecast_dt_iso'])
+    df['slice_dt_iso'] = pd.to_datetime(df['slice_dt_iso'])
 
-    df_unique_dates = df['forecast dt iso'].unique()
+    df_unique_dates = df['forecast_dt_iso'].unique()
 
     # reduce to 48h of weather forecast (from 00:00 to 23:00 each day)
     df_revised = []
     for date in df_unique_dates:
-        data = df[(df['forecast dt iso'] == date) & \
-            (df['slice dt iso'].between(date + dt.timedelta(days=1) - dt.timedelta(hours=12),
+        data = df[(df['forecast_dt_iso'] == date) & \
+            (df['slice_dt_iso'].between(date + dt.timedelta(days=1) - dt.timedelta(hours=12),
                                         date + dt.timedelta(days=2) + dt.timedelta(hours=11)))]
         df_revised.append(data)
 
     df_revised_ordered = pd.concat(df_revised, ignore_index=True)
 
     # hard code the end date to match wiht PV data
-    processed_df = df_revised_ordered[df_revised_ordered['slice dt iso'] <= '2022-12-31 23:00:00']
+    processed_df = df_revised_ordered[df_revised_ordered['slice_dt_iso'] <= '2022-12-31 23:00:00']
 
     return processed_df
 
@@ -163,6 +164,7 @@ def load_raw_pv():
 
 def load_raw_forecast():
     data_raw = get_forecast_data()
+    assert data_raw.columns[0] == 'forecast_dt_unixtime'
     load_data_to_bq(
             data_raw,
             gcp_project=GCP_PROJECT,
@@ -173,7 +175,8 @@ def load_raw_forecast():
 
 def get_forecast_data() -> pd.DataFrame:
     """
-    Load raw data from local directory
+    Load raw data from local directory and rename columns to prevent
+    issues with BigQuery
     """
     absolute_path = os.path.dirname(
                         os.path.dirname(
@@ -182,6 +185,11 @@ def get_forecast_data() -> pd.DataFrame:
     csv_path = os.path.join(absolute_path, relative_path)
 
     df = pd.read_csv(csv_path + 'history_forecast_bulk_20171007_20240312.csv')
+
+    df.rename(columns={'forecast dt unixtime': 'forecast_dt_unixtime',
+               'forecast dt iso': 'forecast_dt_iso',
+               'slice dt unixtime': 'slice_dt_unixtime',
+               'slice dt iso': 'slice_dt_iso'}, inplace=True)
 
     print('# data loaded')
     return df
