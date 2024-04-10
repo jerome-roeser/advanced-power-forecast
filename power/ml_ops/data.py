@@ -7,6 +7,7 @@ from google.cloud import bigquery
 from pathlib import Path
 
 from power.params import *
+from power.utils import compress
 
 
 def clean_pv_data(pv_df: pd.DataFrame) ->pd.DataFrame:
@@ -38,6 +39,41 @@ def clean_pv_data(pv_df: pd.DataFrame) ->pd.DataFrame:
     print('# data cleaned')
     return df
 
+def clean_forecast_data(forecast_df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Initial has 3.3 M entries (everyday: 4 forecasts of 16 days ahead)
+    Cleaning it to: - 1 forecast perday (at 12:00)
+                    - 48 hours a day
+                    - right now hardcoded to match last forecast day with
+                     last day of PV data
+    """
+    df = compress(forecast_df)
+
+    # get only 1 forecast per day and deal with uncommon UTC format
+    df['forecast dt iso'] = df['forecast dt iso'].str.replace('+0000 UTC', '')
+    df['slice dt iso'] = df['slice dt iso'].str.replace('+0000 UTC', '')
+
+    df = df[df['forecast dt iso'].str.contains('12:00:00')]
+
+    df['forecast dt iso'] = pd.to_datetime(df['forecast dt iso'])
+    df['slice dt iso'] = pd.to_datetime(df['slice dt iso'])
+
+    df_unique_dates = df['forecast dt iso'].unique()
+
+    # reduce to 48h of weather forecast (from 00:00 to 23:00 each day)
+    df_revised = []
+    for date in df_unique_dates:
+        data = df[(df['forecast dt iso'] == date) & \
+            (df['slice dt iso'].between(date + dt.timedelta(days=1) - dt.timedelta(hours=12),
+                                        date + dt.timedelta(days=2) + dt.timedelta(hours=11)))]
+        df_revised.append(data)
+
+    df_revised_ordered = pd.concat(df_revised, ignore_index=True)
+
+    # hard code the end date to match wiht PV data
+    processed_df = df_revised_ordered[df_revised_ordered['slice dt iso'] <= '2022-12-31 23:00:00']
+
+    return processed_df
 
 def get_data_with_cache(
         gcp_project:str,
@@ -114,6 +150,21 @@ def get_pv_data() -> pd.DataFrame:
     print('# data loaded')
     return df
 
+
+def get_forecast_data() -> pd.DataFrame:
+    """
+    Load raw data from local directory
+    """
+    absolute_path = os.path.dirname(
+                        os.path.dirname(
+                            os.path.dirname( __file__ )))
+    relative_path = 'raw_data/'
+    csv_path = os.path.join(absolute_path, relative_path)
+
+    df = pd.read_csv(csv_path + 'history_forecast_bulk_20171007_20240312.csv')
+
+    print('# data loaded')
+    return df
 
 def select_years(df: pd.DataFrame, start=1980, end=1980)-> pd.DataFrame:
     """
