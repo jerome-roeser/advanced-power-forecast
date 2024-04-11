@@ -19,7 +19,7 @@ load_raw_forecast:
 	-bq mk --sync --project_id ${GCP_PROJECT} --location=${BQ_REGION} ${BQ_DATASET}.raw_weather_forecast
 	python -c 'from power.ml_ops.data import load_raw_forecast; load_raw_forecast()'
 
-load_raw_all: load_raw_pv, load_raw_forecast
+load_raw_all: load_raw_pv load_raw_forecast
 
 run_preprocess:
 	python -c 'from power.interface.main import preprocess; preprocess()'
