@@ -8,6 +8,7 @@ pd.set_option("display.max_columns", None)
 
 # Manipulating temporal data and check the types of variables
 from typing import Dict, List, Tuple, Sequence
+from power.ml_ops.data import get_weather_forecast_features
 from power.ml_ops.model import mean_historical_power
 
 
@@ -89,7 +90,8 @@ def get_X_y_strides(fold: pd.DataFrame, input_length: int, output_length: int, s
 # Craeting sequences: Option 2 (random sampling) ###############################
 
 def get_Xi_yi(
-    fold:pd.DataFrame,
+    pv_fold:pd.DataFrame,
+    forecast_fold:pd.DataFrame,
     input_length:int,       # 48
     output_length:int,      # 24
     gap_hours):
@@ -100,22 +102,39 @@ def get_Xi_yi(
     '''
     TARGET = 'electricity'
     first_possible_start = 0
-    last_possible_start = len(fold) - (input_length + gap_hours + output_length) + 1
+    last_possible_start = len(pv_fold) - (input_length + gap_hours + output_length) + 1
 
     random_start = np.random.randint(first_possible_start, last_possible_start)
 
+    # input_start & input_end are the indexes of the 48h (training length) of training data
+    # thus for weather forecast data from input_end should be used to add
+    # the weather forecast features
     input_start = random_start
     input_end = random_start + input_length
+    # here we extract the forecast date and hour
+    forecast_date = pv_fold.iloc[input_end]['utc_time'].strftime('%Y-%m-%d')
+    forecast_hour = pv_fold.iloc[input_end]['utc_time'].hour
+
     target_start = input_end + gap_hours
     target_end = target_start + output_length
 
-    X_i = fold.iloc[input_start:input_end]
-    y_i = fold.iloc[target_start:target_end][[TARGET]]    # creates a pd.DataFrame for the target y
+    # first we parse the electricity feature
+    # need to reset index only for X_i in order to be able to concat with X_weather later on
+    X_i = pv_fold.iloc[input_start:input_end].reset_index()
+    y_i = pv_fold.iloc[target_start:target_end][[TARGET]]    # creates a pd.DataFrame for the target y
 
+    # then we parse/create the weather forecast features
+    X_weather = get_weather_forecast_features(forecast_fold, forecast_date)
+
+    #
+    features = ['temperature', 'clouds', 'wind_speed']
+    to_concat = [X_i['electricity'], X_weather[features]]
+    X_i = pd.concat(to_concat, axis=1)
     return (X_i, y_i)
 
 def get_X_y_seq(
-    fold:pd.DataFrame,
+    pv_fold:pd.DataFrame,
+    forecast_fold:pd.DataFrame,
     number_of_sequences:int,
     input_length:int,
     output_length:int,
@@ -128,7 +147,7 @@ def get_X_y_seq(
     X, y = [], []                                                 # lists for the sequences for X and y
 
     for i in range(number_of_sequences):
-        (Xi, yi) = get_Xi_yi(fold, input_length, output_length, gap_hours)   # calls the previous function to generate sequences X + y
+        (Xi, yi) = get_Xi_yi(pv_fold, forecast_fold, input_length, output_length, gap_hours)   # calls the previous function to generate sequences X + y
         X.append(Xi)
         y.append(yi)
 
