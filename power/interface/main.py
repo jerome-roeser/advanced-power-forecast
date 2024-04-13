@@ -87,7 +87,7 @@ def preprocess(min_date = '1980-01-01 00:00:00',
 
 
 def train(
-        min_date = '1980-01-01 00:00:00',
+        min_date = '2017-10-07 00:00:00',
         max_date = '2019-12-31 23:00:00',
         split_ratio: float = 0.02, # 0.02 represents ~ 1 month of validation data on a 2009-2015 train set
         learning_rate=0.02,
@@ -146,8 +146,8 @@ def train(
         return None
 
     # Split the data into training and testing sets
-    train_pv = data_processed_pv[data_processed_pv['utc_time'] < max_date]
-
+    train_pv = data_processed_pv[(data_processed_pv['utc_time'] > min_date) \
+                                 & (data_processed_pv['utc_time'] < max_date)]
 
     if data_processed_forecast.shape[0] < 240:
         print("❌ Not enough processed data retrieved to train on")
@@ -155,8 +155,6 @@ def train(
 
     # Split the data into training and testing sets
     train_forecast = data_processed_forecast
-
-
 
     X_train, y_train = get_X_y_seq(train_pv,
                                    train_forecast,
@@ -330,7 +328,7 @@ def pred(input_pred:str = '2013-05-08 12:00:00',
 if __name__ == '__main__':
     preprocess(min_date = '1980-01-01 00:00:00',
                max_date = '2022-12-31 23:00:00')
-    train(min_date = '1980-01-01 00:00:00',
+    train(min_date = '2017-10-07 00:00:00',
           max_date = '2019-12-30 23:00:00')
     evaluate()
     pred('2013-05-08 12:00:00')
