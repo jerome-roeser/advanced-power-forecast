@@ -107,34 +107,59 @@ def train(
     print(Fore.BLUE + "\nLoading preprocessed validation data..." + Style.RESET_ALL)
 
 
-    # Load processed data using `get_data_with_cache` in chronological order
-    query = f"""
+    # --First-- Load processed PV data using `get_data_with_cache` in chronological order
+    query_pv = f"""
         SELECT *
-        FROM {GCP_PROJECT}.{BQ_DATASET}.processed_pv
+        FROM {GCP_PROJECT}.{BQ_DATASET}.processed_forecast
         ORDER BY utc_time
     """
 
-    data_processed_cache_path = Path(LOCAL_DATA_PATH).joinpath("processed", f"processed_pv.csv")
-    data_processed = get_data_with_cache(
+    data_processed_pv_cache_path = Path(LOCAL_DATA_PATH).joinpath("processed", f"processed_pv.csv")
+    data_processed_pv = get_data_with_cache(
         gcp_project=GCP_PROJECT,
-        query=query,
-        cache_path=data_processed_cache_path,
+        query=query_pv,
+        cache_path=data_processed_pv_cache_path,
         data_has_header=True
     )
 
-    # the processed data from bq needs to be converted to datetime object
-    data_processed.utc_time = pd.to_datetime(data_processed.utc_time,utc=True)
+    # --Second-- Load processed Weather Forecast data in chronological order
+    query_forecast = f"""
+        SELECT *
+        FROM {GCP_PROJECT}.{BQ_DATASET}.processed_weather_forecast
+        ORDER BY forecast_dt_unixtime
+    """
 
-    if data_processed.shape[0] < 240:
+    data_processed_forecast_cache_path = Path(LOCAL_DATA_PATH).joinpath("processed", f"processed_weather_forecast.csv")
+    data_processed_forecast = get_data_with_cache(
+        gcp_project=GCP_PROJECT,
+        query=query_forecast,
+        cache_path=data_processed_forecast_cache_path,
+        data_has_header=True
+    )
+
+
+    # the processed PV data from bq needs to be converted to datetime object
+    data_processed_pv.utc_time = pd.to_datetime(data_processed_pv.utc_time,utc=True)
+
+    if data_processed_pv.shape[0] < 240:
         print("❌ Not enough processed data retrieved to train on")
         return None
 
     # Split the data into training and testing sets
-    train = data_processed[data_processed['utc_time'] < max_date]
+    train_pv = data_processed_pv[data_processed_pv['utc_time'] < max_date]
 
-    train = train[['electricity']]
 
-    X_train, y_train = get_X_y_seq(train,
+    if data_processed_forecast.shape[0] < 240:
+        print("❌ Not enough processed data retrieved to train on")
+        return None
+
+    # Split the data into training and testing sets
+    train_forecast = data_processed_forecast
+
+
+
+    X_train, y_train = get_X_y_seq(train_pv,
+                                   train_forecast,
                                    number_of_sequences=10_000,
                                    input_length=48,
                                    output_length=24,
