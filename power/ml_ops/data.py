@@ -194,6 +194,32 @@ def get_forecast_data() -> pd.DataFrame:
     print('# data loaded')
     return df
 
+def get_weather_forecast_features(forecast: pd.DataFrame, input_date: str) -> pd.DataFrame:
+    """
+    returns the weather forecast data from historical weather forecast in Tempelhof
+    input: - a processed forecast dataframe of shape (91704,21)
+           - an input date (str: YYYY-MM-DD)
+    output: a dataframe of shape (48, 21)
+            -> first 24 rows: hourly (from 00:00 to 23:00) weather forecast
+               of input_date +1 forecast on input_date -1 (at 12:00)
+            -> second 24 rows: hourly (from 00:00 to 23:00) weather forecast
+               of input_date +1 forecast on input_date (at 12:00)
+    """
+    forecast.rename(columns={'forecast_dt_iso':'utc_time',
+                        'slice_dt_iso':'prediction_utc_time'},
+                        inplace=True)
+    forecast['utc_time'] = pd.to_datetime(forecast['utc_time'])
+    forecast['prediction_utc_time'] = pd.to_datetime(forecast['prediction_utc_time'])
+
+    input_datetime = dt.datetime.strptime(input_date, '%Y-%m-%d')
+
+    forecast_day_before_input_date = forecast[forecast.utc_time.dt.date == (input_datetime.date() - dt.timedelta(days=1))].iloc[-24:,:]
+    forecast_input_date = forecast[forecast.utc_time.dt.date == input_datetime.date()].iloc[:24,:]
+    df_forecast = pd.concat([forecast_day_before_input_date,
+                             forecast_input_date], axis=0).reset_index(drop=True)
+    return df_forecast
+
+
 def select_years(df: pd.DataFrame, start=1980, end=1980)-> pd.DataFrame:
     """
     Select a subset of the cleaned data to process it further. Use this function
