@@ -59,7 +59,7 @@ def preprocess(min_date = '1980-01-01 00:00:00',
     query_forecast = f"""
         SELECT *
         FROM {GCP_PROJECT}.{BQ_DATASET}.raw_weather_forecast
-        ORDER BY forecast_dt_unixtime
+        ORDER BY forecast_dt_unixtime, slice_dt_unixtime
     """
 
     # Retrieve data using `get_data_with_cache`
@@ -110,7 +110,7 @@ def train(
     # --First-- Load processed PV data using `get_data_with_cache` in chronological order
     query_pv = f"""
         SELECT *
-        FROM {GCP_PROJECT}.{BQ_DATASET}.processed_forecast
+        FROM {GCP_PROJECT}.{BQ_DATASET}.processed_pv
         ORDER BY utc_time
     """
 
@@ -126,7 +126,7 @@ def train(
     query_forecast = f"""
         SELECT *
         FROM {GCP_PROJECT}.{BQ_DATASET}.processed_weather_forecast
-        ORDER BY forecast_dt_unixtime
+        ORDER BY forecast_dt_unixtime, slice_dt_unixtime
     """
 
     data_processed_forecast_cache_path = Path(LOCAL_DATA_PATH).joinpath("processed", f"processed_weather_forecast.csv")
