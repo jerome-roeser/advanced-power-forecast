@@ -126,9 +126,11 @@ def get_Xi_yi(
     # then we parse/create the weather forecast features
     X_weather = get_weather_forecast_features(forecast_fold, forecast_date)
 
-    #
-    features = ['utc_time', 'prediction_utc_time','temperature', 'clouds', 'wind_speed']
-    to_concat = [X_i[['utc_time','electricity']], X_weather[features]]
+    # features = ['utc_time', 'prediction_utc_time','temperature', 'clouds', 'wind_speed']
+    # to_concat = [X_i[['utc_time','electricity']], X_weather[features]]
+
+    features = ['temperature', 'clouds', 'accumulated','wind_speed']
+    to_concat = [X_i[['electricity']], X_weather[features]]
     X_i = pd.concat(to_concat, axis=1)
     return (X_i, y_i)
 
