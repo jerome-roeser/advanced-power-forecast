@@ -8,6 +8,7 @@ pd.set_option("display.max_columns", None)
 
 # Manipulating temporal data and check the types of variables
 from typing import Dict, List, Tuple, Sequence
+from power.ml_ops.model import mean_historical_power
 
 
 # Creating FOLDs ##############################################################
@@ -114,6 +115,56 @@ def get_Xi_yi(
     return (X_i, y_i)
 
 def get_X_y_seq(
+    fold:pd.DataFrame,
+    number_of_sequences:int,
+    input_length:int,
+    output_length:int,
+    gap_hours=0):
+    '''
+    Given a fold, it creates a series of sequences randomly
+    as many as being specified
+    '''
+
+    X, y = [], []                                                 # lists for the sequences for X and y
+
+    for i in range(number_of_sequences):
+        (Xi, yi) = get_Xi_yi(fold, input_length, output_length, gap_hours)   # calls the previous function to generate sequences X + y
+        X.append(Xi)
+        y.append(yi)
+
+    return np.array(X), np.array(y)
+
+
+def get_Xi_yi_mean_baseline(
+    fold:pd.DataFrame,
+    input_length:int,       # 48
+    output_length:int,      # 24
+    gap_hours,
+    processed_pv: pd.DataFrame):
+    '''
+    - given a fold, it returns one sequence (X_i, y_i)
+    - with the starting point of the sequence being chosen at random
+    - TARGET is the variable(s) we want to predict (name of the column(s))
+    '''
+    TARGET = 'electricity'
+    first_possible_start = 0
+    last_possible_start = len(fold) - (input_length + gap_hours + output_length) + 1
+
+    random_start = np.random.randint(first_possible_start, last_possible_start)
+
+    input_start = random_start
+    input_end = random_start + input_length
+    target_start = input_end + gap_hours
+    target_end = target_start + output_length
+
+    X_i = fold.iloc[input_start:input_end]
+    y_i = fold.iloc[target_start:target_end][[TARGET]]
+    input_date = fold.iloc[target_start:target_end].utc_time[0][:10]
+    y_i['electricity'] = mean_historical_power(processed_pv, input_date)
+
+    return (X_i, y_i)
+
+def get_X_y_seq_mean_baseline(
     fold:pd.DataFrame,
     number_of_sequences:int,
     input_length:int,

@@ -7,6 +7,7 @@ from google.cloud import bigquery
 from pathlib import Path
 
 from power.params import *
+from power.utils import compress
 
 
 def clean_pv_data(pv_df: pd.DataFrame) ->pd.DataFrame:
@@ -38,6 +39,42 @@ def clean_pv_data(pv_df: pd.DataFrame) ->pd.DataFrame:
     print('# data cleaned')
     return df
 
+def clean_forecast_data(forecast_df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Initial has 3.3 M entries (everyday: 4 forecasts of 16 days ahead)
+    Cleaning it to: - 1 forecast perday (at 12:00)
+                    - 48 hours a day
+                    - right now hardcoded to match last forecast day with
+                     last day of PV data
+    """
+    df = compress(forecast_df)
+
+
+    # get only 1 forecast per day and deal with uncommon UTC format
+    df['forecast_dt_iso'] = df['forecast_dt_iso'].str.replace('+0000 UTC', '')
+    df['slice_dt_iso'] = df['slice_dt_iso'].str.replace('+0000 UTC', '')
+
+    df = df[df['forecast_dt_iso'].str.contains('12:00:00')]
+
+    df['forecast_dt_iso'] = pd.to_datetime(df['forecast_dt_iso'])
+    df['slice_dt_iso'] = pd.to_datetime(df['slice_dt_iso'])
+
+    df_unique_dates = df['forecast_dt_iso'].unique()
+
+    # reduce to 48h of weather forecast (from 00:00 to 23:00 each day)
+    df_revised = []
+    for date in df_unique_dates:
+        data = df[(df['forecast_dt_iso'] == date) & \
+            (df['slice_dt_iso'].between(date + dt.timedelta(days=1) - dt.timedelta(hours=12),
+                                        date + dt.timedelta(days=2) + dt.timedelta(hours=11)))]
+        df_revised.append(data)
+
+    df_revised_ordered = pd.concat(df_revised, ignore_index=True)
+
+    # hard code the end date to match wiht PV data
+    processed_df = df_revised_ordered[df_revised_ordered['slice_dt_iso'] <= '2022-12-31 23:00:00']
+
+    return processed_df
 
 def get_data_with_cache(
         gcp_project:str,
@@ -114,6 +151,48 @@ def get_pv_data() -> pd.DataFrame:
     print('# data loaded')
     return df
 
+def load_raw_pv():
+    data_raw = get_pv_data()
+    assert data_raw.columns[0] == '_0-1'
+    load_data_to_bq(
+            data_raw,
+            gcp_project=GCP_PROJECT,
+            bq_dataset=BQ_DATASET,
+            table=f'raw_pv',
+            truncate=True
+        )
+
+def load_raw_forecast():
+    data_raw = get_forecast_data()
+    assert data_raw.columns[0] == 'forecast_dt_unixtime'
+    load_data_to_bq(
+            data_raw,
+            gcp_project=GCP_PROJECT,
+            bq_dataset=BQ_DATASET,
+            table=f'raw_weather_forecast',
+            truncate=True
+        )
+
+def get_forecast_data() -> pd.DataFrame:
+    """
+    Load raw data from local directory and rename columns to prevent
+    issues with BigQuery
+    """
+    absolute_path = os.path.dirname(
+                        os.path.dirname(
+                            os.path.dirname( __file__ )))
+    relative_path = 'raw_data/'
+    csv_path = os.path.join(absolute_path, relative_path)
+
+    df = pd.read_csv(csv_path + 'history_forecast_bulk_20171007_20240312.csv')
+
+    df.rename(columns={'forecast dt unixtime': 'forecast_dt_unixtime',
+               'forecast dt iso': 'forecast_dt_iso',
+               'slice dt unixtime': 'slice_dt_unixtime',
+               'slice dt iso': 'slice_dt_iso'}, inplace=True)
+
+    print('# data loaded')
+    return df
 
 def select_years(df: pd.DataFrame, start=1980, end=1980)-> pd.DataFrame:
     """

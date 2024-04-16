@@ -29,8 +29,10 @@ bq mk \
 ``` python
 bq mk --location=$GCP_REGION $BQ_DATASET.raw_pv
 bq mk --location=$GCP_REGION $BQ_DATASET.raw_wind
+bq mk --location=$GCP_REGION $BQ_DATASET.raw_weather_forecast
 bq mk --location=$GCP_REGION $BQ_DATASET.processed_pv
 bq mk --location=$GCP_REGION $BQ_DATASET.processed_wind
+bq mk --location=$GCP_REGION $BQ_DATASET.processed_weather_forecast
 ```
 ```  python
 bq show
@@ -47,4 +49,3 @@ direnv reload .
 👉 Run separately `reset_local_files`, `reset_bq_files` or `reset_gcs_files` to remove local, BigQuery or Cloud Storage independantly.
 
 👉 Run make `show_sources_all` to see that you’re back from a blank state!
-

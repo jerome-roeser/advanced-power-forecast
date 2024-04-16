@@ -9,7 +9,7 @@ from typing import Dict, List, Tuple, Sequence
 from datetime import datetime
 
 from power.params import *
-from power.ml_ops.data import get_data_with_cache, load_data_to_bq, clean_pv_data
+from power.ml_ops.data import get_data_with_cache, load_data_to_bq, clean_pv_data, clean_forecast_data
 from power.ml_ops.model import initialize_model, compile_model, train_model, evaluate_model
 from power.ml_ops.registry import load_model, save_model, save_results
 from power.ml_ops.cross_val import get_X_y_seq
@@ -26,31 +26,60 @@ def preprocess(min_date = '1980-01-01 00:00:00',
 
     print(Fore.MAGENTA + "\n ⭐️ Use case: preprocess" + Style.RESET_ALL)
 
-    # Query raw data from BUCKET BigQuery using `get_data_with_cache`
-    query = f"""
+    # Query raw PV data from BUCKET BigQuery using `get_data_with_cache`
+    query_pv = f"""
         SELECT *
         FROM {GCP_PROJECT}.{BQ_DATASET}.raw_pv
         ORDER BY _0
     """
 
     # Retrieve data using `get_data_with_cache`
-    data_query_cache_path = Path(LOCAL_DATA_PATH).joinpath("raw", f"raw_pv.csv")
-    data_query = get_data_with_cache(
-        query=query,
+    data_pv_query_cache_path = Path(LOCAL_DATA_PATH).joinpath("raw", f"raw_pv.csv")
+    data_pv_query = get_data_with_cache(
+        query=query_pv,
         gcp_project=GCP_PROJECT,
-        cache_path=data_query_cache_path,
+        cache_path=data_pv_query_cache_path,
         data_has_header=True
     )
 
     # Process data
-    data_clean = clean_pv_data(data_query)
+    data_pv_clean = clean_pv_data(data_pv_query)
 
 
     load_data_to_bq(
-        data_clean,
+        data_pv_clean,
         gcp_project=GCP_PROJECT,
         bq_dataset=BQ_DATASET,
         table=f'processed_pv',
+        truncate=True
+    )
+
+     # Query raw historical weather forecast data from BUCKET BigQuery
+     # using `get_data_with_cache`
+    query_forecast = f"""
+        SELECT *
+        FROM {GCP_PROJECT}.{BQ_DATASET}.raw_weather_forecast
+        ORDER BY forecast_dt_unixtime
+    """
+
+    # Retrieve data using `get_data_with_cache`
+    data_forecast_query_cache_path = Path(LOCAL_DATA_PATH).joinpath("raw", f"raw_weather_forecast.csv")
+    data_forecast_query = get_data_with_cache(
+        query=query_forecast,
+        gcp_project=GCP_PROJECT,
+        cache_path=data_forecast_query_cache_path,
+        data_has_header=True
+    )
+
+    # Process data
+    data_forecast_clean = clean_forecast_data(data_forecast_query)
+
+
+    load_data_to_bq(
+        data_forecast_clean,
+        gcp_project=GCP_PROJECT,
+        bq_dataset=BQ_DATASET,
+        table=f'processed_weather_forecast',
         truncate=True
     )
 
