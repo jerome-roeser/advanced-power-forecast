@@ -180,7 +180,7 @@ def get_Xi_yi_pv(
     target_start = input_end + gap_hours
     target_end = target_start + output_length
 
-    X_i = fold.iloc[input_start:input_end]
+    X_i = fold.iloc[input_start:input_end][TARGET]
     y_i = fold.iloc[target_start:target_end][[TARGET]]   # creates a pd.DataFrame for the target y
 
     return (X_i, y_i)
@@ -199,7 +199,7 @@ def get_X_y_seq_pv(
     X, y = [], []                # lists for the sequences for X and y
 
     for i in range(number_of_sequences):
-        (Xi, yi) = get_Xi_yi(fold, input_length, output_length, gap_hours)   # calls the previous function to generate sequences X + y
+        (Xi, yi) = get_Xi_yi_pv(fold, input_length, output_length, gap_hours)   # calls the previous function to generate sequences X + y
         X.append(Xi)
         y.append(yi)
 
