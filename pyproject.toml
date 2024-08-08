@@ -3,7 +3,7 @@ requires = ["setuptools"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "z_power_jr"
+name = "advanced-power-forecast"
 version = "0.3"
 authors = [
     {name = "Marius Hoernschemeyer"},
