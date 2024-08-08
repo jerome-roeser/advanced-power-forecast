@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "z_power_jr"
+version = "0.3"
+authors = [
+    {name = "Marius Hoernschemeyer"},
+    {name = "Ali Kakavand"},
+    {name = "Jérôme Roeser"},
+    {name = "Jérôme Roeser", email = "jerome.roeser@gmail.com"},
+    {name = "Huajie Yin"},
+]
+description = """
+              -- Le Wagon Team project --
+              """
+readme = "README.md"
+requires-python = ">=3.8"
+keywords = ["deep learning", "lstm"]
+license = {text = "MIT"}
+dynamic = ["dependencies"]
+
+[tool.setuptools.packages]
+find = {}
+
+[tool.setuptools.dynamic]
+dependencies = {file = ["requirements.txt"]}
