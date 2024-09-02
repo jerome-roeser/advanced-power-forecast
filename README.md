@@ -9,7 +9,7 @@ effort aiming at the green energy transition.
 
 The energy market will need more tools to predict the production of those intermittent energy source. Unlike coal- or nuclear-based energy production, solar and wind energy is not constant.
 
-# 💲 As a business you need to be able to predict the day ahead energy market to place selling orders  📈
+## 💲 As a business you need to be able to predict the day ahead energy production of your solarpark market to place selling orders on the energy market 📈
 
 ✅ We got you covered with our day ahead Photovolataic Energy production App!
 
