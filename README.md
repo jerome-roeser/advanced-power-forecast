@@ -1,51 +1,21 @@
-# GCP Setup
+# Day-Ahead Power Forecast app
 
-💻 Create a bucket in your GCP account
+Global warming and its resulting climate change is re-shaping our society and actions have to be taken to
+try to minimize the macro effects on our 🌍
 
-Make sure to create the bucket where you are located yourself (use `GCP_REGION` in the `.env`)
-Fill also the `BUCKET_NAME` variable with the name of your choice (must be globally unique and lower case! If you have an uppercase letter in your GitHub username, you’ll need to make it lower case!)
-e.g.
+The use of renewable resources, such as ☀️, 🌬️ or others will contribute to that
+effort aiming at the green energy transition.
 
-``` python
-gsutil mb \
-    -l $GCP_REGION \
-    -p $GCP_PROJECT \
-    gs://$BUCKET_NAME
-```
-``` python
-direnv reload .
-```
 
-💻 Create an dataset where preprocessed data will be stored & queried
+The energy market will need more tools to predict the production of those intermittent energy source. Unlike coal- or nuclear-based energy production, solar and wind energy is not constant.
 
-Using `bq` and the following env variables, create a new dataset called power on your own `GCP_PROJECT`
+# 💲 As a business you need to be able to predict the day ahead energy market to place selling orders  📈
 
-``` python
-bq mk \
-    --project_id $GCP_PROJECT \
-    --data_location $BQ_REGION \
-    $BQ_DATASET
-```
-``` python
-bq mk --location=$GCP_REGION $BQ_DATASET.raw_pv
-bq mk --location=$GCP_REGION $BQ_DATASET.raw_wind
-bq mk --location=$GCP_REGION $BQ_DATASET.raw_weather_forecast
-bq mk --location=$GCP_REGION $BQ_DATASET.processed_pv
-bq mk --location=$GCP_REGION $BQ_DATASET.processed_wind
-bq mk --location=$GCP_REGION $BQ_DATASET.processed_weather_forecast
-```
-```  python
-bq show
-bq show $BQ_DATASET
-bq show $BQ_DATASET.raw_pv
-bq show $BQ_DATASET.processed_pv
-```
-``` python
-direnv reload .
-```
+✅ We got you covered with our day ahead Photovolataic Energy production App!
 
-👉 Run make `reset_all_files` directive –> It resets all local files (csvs, models, …) and data from bq tables and buckets, but preserve local folder structure, bq tables schema, and gsutil buckets.
 
-👉 Run separately `reset_local_files`, `reset_bq_files` or `reset_gcs_files` to remove local, BigQuery or Cloud Storage independantly.
+Check out our [streamlit](https://advanced-power-forecast-photovoltaic.streamlit.app/) App:
 
-👉 Run make `show_sources_all` to see that you’re back from a blank state!
+
+
+![alt text](power/images/screenshot-1.png "Day-Ahead Power Forecast")
