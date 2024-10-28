@@ -1,6 +1,6 @@
 
 run_main:
-	python -m power.interface.main
+	@python -m power.interface.main
 
 streamlit:
 	@streamlit run ui/app.py
@@ -25,14 +25,14 @@ clean-pyc:
 	find . -name '__pycache__' -exec rm -fr {} +
 
 load_raw_pv:
-	-bq rm --project_id ${GCP_PROJECT} ${BQ_DATASET}.raw_pv
-	-bq mk --sync --project_id ${GCP_PROJECT} --location=${BQ_REGION} ${BQ_DATASET}.raw_pv
-	python -c 'from power.ml_ops.data import load_raw_pv; load_raw_pv()'
+	@-bq rm --project_id ${GCP_PROJECT} ${BQ_DATASET}.raw_pv
+	@-bq mk --sync --project_id ${GCP_PROJECT} --location=${BQ_REGION} ${BQ_DATASET}.raw_pv
+	@python -c 'from power.ml_ops.data import load_raw_pv; load_raw_pv()'
 
 load_raw_forecast:
-	-bq rm --project_id ${GCP_PROJECT} ${BQ_DATASET}.raw_weather_forecast
-	-bq mk --sync --project_id ${GCP_PROJECT} --location=${BQ_REGION} ${BQ_DATASET}.raw_weather_forecast
-	python -c 'from power.ml_ops.data import load_raw_forecast; load_raw_forecast()'
+	@-bq rm --project_id ${GCP_PROJECT} ${BQ_DATASET}.raw_weather_forecast
+	@-bq mk --sync --project_id ${GCP_PROJECT} --location=${BQ_REGION} ${BQ_DATASET}.raw_weather_forecast
+	@python -c 'from power.ml_ops.data import load_raw_forecast; load_raw_forecast()'
 
 load_raw_all: load_raw_pv load_raw_forecast
 
@@ -53,6 +53,20 @@ run_all: run_preprocess run_train run_pred run_evaluate
 run_api:
 	uvicorn power.api.fast:app --reload
 
+clean: clean-build clean-pyc
+
+clean-build:
+	@rm -fr build/
+	@rm -fr dist/
+	@rm -fr .eggs/
+	@find . -name '*.egg-info' -exec rm -fr {} +
+	@find . -name '*.egg' -exec rm -f {} +
+
+clean-pyc:
+	@find . -name '*.pyc' -exec rm -f {} +
+	@find . -name '*.pyo' -exec rm -f {} +
+	@find . -name '*~' -exec rm -f {} +
+	@find . -name '__pycache__' -exec rm -fr {} +
 
 ################### DATA SOURCES ACTIONS ################
 
