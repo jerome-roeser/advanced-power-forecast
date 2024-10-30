@@ -180,7 +180,7 @@ def get_Xi_yi_pv(
     target_start = input_end + gap_hours
     target_end = target_start + output_length
 
-    X_i = fold.iloc[input_start:input_end][TARGET]
+    X_i = fold.iloc[input_start:input_end][[TARGET]]
     y_i = fold.iloc[target_start:target_end][[TARGET]]   # creates a pd.DataFrame for the target y
 
     return (X_i, y_i)
