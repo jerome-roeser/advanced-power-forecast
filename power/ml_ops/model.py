@@ -2,7 +2,8 @@ import pandas as pd
 import datetime
 import tensorflow as tf
 
-from tensorflow.keras import models, layers, optimizers, metrics
+from tensorflow.keras import models, layers, optimizers
+from tensorflow.keras.metrics import MeanAbsoluteError, MeanSquaredError
 from tensorflow.keras import backend as K
 from tensorflow.keras.layers import Lambda
 from tensorflow.keras.callbacks import EarlyStopping
@@ -16,17 +17,18 @@ def initialize_model(X_train, y_train, n_unit=24):
 
     # 1 - RNN architecture
     # ======================
-    model = models.Sequential()
-
-    ## 1.1 - Recurrent Layer
-    model.add(layers.LSTM(n_unit,
-                          activation='tanh',
-                          return_sequences = False,
-                          input_shape=(X_train.shape[1],X_train.shape[2])
-                          ))
-    ## 1.2 - Predictive Dense Layers
     output_length = y_train.shape[1]
-    model.add(layers.Dense(output_length, activation='linear'))
+
+    model = models.Sequential([
+        ## 1.0 - Input Layer
+        layers.Input(shape=(X_train.shape[1],X_train.shape[2])),
+        ## 1.1 - Normailzation Layer
+        layers.Normalization(),
+        ## 1.2 - Recurrent Layer
+        layers.LSTM(units=n_unit, activation='tanh', return_sequences = False),
+        ## 1.3 - Predictive Dense Layers
+        layers.Dense(output_length, activation='linear'),
+        ])
 
     return model
 
@@ -40,6 +42,9 @@ def compile_model(model, learning_rate=0.02):
     adam = optimizers.Adam(learning_rate=learning_rate)
     # model.compile(loss='mse', optimizer=adam, metrics=['mae', r_squared])
     model.compile(loss='mse', optimizer=adam, metrics=['mae'])
+    # model.compile(loss='mse', optimizer=adam, metrics=[MeanAbsoluteError(),
+    #                                                    MeanSquaredError(),
+    #                                                   ])
 
     return model
 
