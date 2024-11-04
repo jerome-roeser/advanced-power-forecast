@@ -1,5 +1,5 @@
 raw_data/
-notebooks/
+# notebooks/
 power/.lewagon/
 .env.yaml
 
