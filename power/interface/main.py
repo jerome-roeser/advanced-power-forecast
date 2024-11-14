@@ -230,8 +230,8 @@ def train(
             row_count=len(X_train),
         )
 
-        # Save results on the hard drive using taxifare.ml_logic.registry
-        save_results(params=params, metrics=dict(mae=val_mae))
+        # Save results on the hard drive using power.ml_logic.registry
+        save_results(params=params, metrics=dict(mae=val_mae), history=history)
 
         # Save model weight on the hard drive (and optionally on GCS too!)
         save_model(model=model)
