@@ -9,7 +9,8 @@ from pathlib import Path
 from power.params import *
 from power.utils import compress
 
-
+### Cleaning ===================================================================
+# ==============================================================================
 def clean_pv_data(pv_df: pd.DataFrame) ->pd.DataFrame:
     """
     Remove unnecessary columns and convert to right dtypes
@@ -76,6 +77,7 @@ def clean_forecast_data(forecast_df: pd.DataFrame) -> pd.DataFrame:
 
     return processed_df
 
+#
 def get_data_with_cache(
         gcp_project:str,
         query:str,
@@ -135,7 +137,8 @@ def load_data_to_bq(
 
     print(f"✅ Data saved to bigquery, with shape {data.shape}")
 
-# probably obsolete now ....
+### Initiliaze Data ============================================================
+# ==============================================================================
 def get_pv_data() -> pd.DataFrame:
     """
     Load raw data from local directory
@@ -151,6 +154,7 @@ def get_pv_data() -> pd.DataFrame:
     print('# data loaded')
     return df
 
+# Used in Makefile
 def load_raw_pv():
     data_raw = get_pv_data()
     assert data_raw.columns[0] == '_0-1'
@@ -161,7 +165,7 @@ def load_raw_pv():
             table=f'raw_pv',
             truncate=True
         )
-
+# Used in Makefile
 def load_raw_forecast():
     data_raw = get_forecast_data()
     assert data_raw.columns[0] == 'forecast_dt_unixtime'
@@ -194,6 +198,7 @@ def get_forecast_data() -> pd.DataFrame:
     print('# data loaded')
     return df
 
+# Cleaning
 def get_weather_forecast_features(forecast: pd.DataFrame, input_date: str) -> pd.DataFrame:
     """
     returns the weather forecast data from historical weather forecast in Tempelhof
@@ -219,7 +224,7 @@ def get_weather_forecast_features(forecast: pd.DataFrame, input_date: str) -> pd
                              forecast_input_date], axis=0).reset_index(drop=True)
     return df_forecast
 
-
+# Not used anywhere
 def select_years(df: pd.DataFrame, start=1980, end=1980)-> pd.DataFrame:
     """
     Select a subset of the cleaned data to process it further. Use this function
@@ -277,7 +282,7 @@ def postprocess(
   today: str,
   preprocessed_df: pd.DataFrame,
   stats_df: pd.DataFrame,
-  pred_df: pd.DataFrame,
+  pred_df: pd.DataFrame = None,
 ) -> pd.DataFrame:
   """
   Create a df that contains all information necessary for the plot in streamlit.
@@ -310,6 +315,7 @@ def postprocess(
   plot_df = pd.merge(plot_df, stats_df, on='hour_of_year', how='inner')
 
   # add prediction for day-ahead in time window
-  plot_df = pd.merge(plot_df, pred_df, on='utc_time', how='left')
+  if pred_df is not None:
+    plot_df = pd.merge(plot_df, pred_df, on='utc_time', how='left')
 
   return plot_df
