@@ -73,6 +73,8 @@ reset_local_files:
 	mkdir power/.lewagon/mlops/training_outputs
 	mkdir power/.lewagon/mlops/training_outputs/metrics
 	mkdir power/.lewagon/mlops/training_outputs/models
+	mkdir power/.lewagon/mlops/training_outputs/models/pv
+	mkdir power/.lewagon/mlops/training_outputs/models/full
 	mkdir power/.lewagon/mlops/training_outputs/params
 
 reset_bq_files:
