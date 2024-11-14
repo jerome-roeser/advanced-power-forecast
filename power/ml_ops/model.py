@@ -22,7 +22,7 @@ def initialize_model(X_train, y_train, n_unit=24):
     model = models.Sequential([
         ## 1.0 - Input Layer
         layers.Input(shape=(X_train.shape[1],X_train.shape[2])),
-        ## 1.1 - Normailzation Layer
+        ## 1.1 - Normalization Layer
         layers.Normalization(),
         ## 1.2 - Recurrent Layer
         layers.LSTM(units=n_unit, activation='tanh', return_sequences = False),
