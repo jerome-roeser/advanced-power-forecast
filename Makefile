@@ -53,21 +53,6 @@ run_all: run_preprocess run_train run_pred run_evaluate
 run_api:
 	uvicorn power.api.fast:app --reload
 
-clean: clean-build clean-pyc
-
-clean-build:
-	@rm -fr build/
-	@rm -fr dist/
-	@rm -fr .eggs/
-	@find . -name '*.egg-info' -exec rm -fr {} +
-	@find . -name '*.egg' -exec rm -f {} +
-
-clean-pyc:
-	@find . -name '*.pyc' -exec rm -f {} +
-	@find . -name '*.pyo' -exec rm -f {} +
-	@find . -name '*~' -exec rm -f {} +
-	@find . -name '__pycache__' -exec rm -fr {} +
-
 ################### DATA SOURCES ACTIONS ################
 
 # Data sources: targets for monthly data imports
@@ -88,7 +73,10 @@ reset_local_files:
 	mkdir power/.lewagon/mlops/training_outputs
 	mkdir power/.lewagon/mlops/training_outputs/metrics
 	mkdir power/.lewagon/mlops/training_outputs/models
+	mkdir power/.lewagon/mlops/training_outputs/models/pv
+	mkdir power/.lewagon/mlops/training_outputs/models/full
 	mkdir power/.lewagon/mlops/training_outputs/params
+	mkdir power/.lewagon/mlops/training_outputs/histories
 
 reset_bq_files:
 	-bq rm --project_id ${GCP_PROJECT} ${BQ_DATASET}.processed_pv

@@ -147,7 +147,7 @@ def get_X_y_seq(
     as many as being specified
     '''
 
-    X, y = [], []                                                 # lists for the sequences for X and y
+    X, y = [], []       # lists for the sequences for X and y
 
     for i in range(number_of_sequences):
         (Xi, yi) = get_Xi_yi(pv_fold, forecast_fold, input_length, output_length, gap_hours)   # calls the previous function to generate sequences X + y
@@ -180,7 +180,7 @@ def get_Xi_yi_pv(
     target_start = input_end + gap_hours
     target_end = target_start + output_length
 
-    X_i = fold.iloc[input_start:input_end][TARGET]
+    X_i = fold.iloc[input_start:input_end][[TARGET]]
     y_i = fold.iloc[target_start:target_end][[TARGET]]   # creates a pd.DataFrame for the target y
 
     return (X_i, y_i)
@@ -196,7 +196,7 @@ def get_X_y_seq_pv(
     as many as being specified
     '''
 
-    X, y = [], []                # lists for the sequences for X and y
+    X, y = [], []    # lists for the sequences for X and y
 
     for i in range(number_of_sequences):
         (Xi, yi) = get_Xi_yi_pv(fold, input_length, output_length, gap_hours)   # calls the previous function to generate sequences X + y
@@ -204,7 +204,6 @@ def get_X_y_seq_pv(
         y.append(yi)
 
     return np.array(X), np.array(y)
-
 
 
 # Creating sequences for mean baseline model ###############################

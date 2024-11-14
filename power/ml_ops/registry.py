@@ -9,7 +9,7 @@ from google.cloud import storage
 
 from power.params import *
 
-def save_results(params: dict, metrics: dict) -> None:
+def save_results(params: dict, metrics: dict, history: dict = None) -> None:
     """
     Persist params & metrics locally on the hard drive at
     "{LOCAL_REGISTRY_PATH}/params/{current_timestamp}.pickle"
@@ -31,10 +31,16 @@ def save_results(params: dict, metrics: dict) -> None:
         with open(metrics_path, "wb") as file:
             pickle.dump(metrics, file)
 
+    # Save history locally
+    if history is not None:
+        history_path = os.path.join(LOCAL_REGISTRY_PATH, "histories", timestamp + ".pickle")
+        with open(history_path, "wb") as file:
+            pickle.dump(history, file)
+
     print("✅ Results saved locally")
 
 
-def save_model(model: keras.Model = None) -> None:
+def save_model(model: keras.Model = None, forecast_features: bool = False) -> None:
     """
     Persist trained model locally on the hard drive at f"{LOCAL_REGISTRY_PATH}/models/{timestamp}.h5"
     - if MODEL_TARGET='gcs', also persist it in your bucket on GCS at "models/{timestamp}.h5" --> unit 02 only
@@ -44,7 +50,10 @@ def save_model(model: keras.Model = None) -> None:
     timestamp = time.strftime("%Y%m%d-%H%M%S")
 
     # Save model locally
-    model_path = os.path.join(LOCAL_REGISTRY_PATH, "models", f"{timestamp}.h5")
+    if forecast_features:
+        model_path = os.path.join(LOCAL_REGISTRY_PATH, "models", "full", f"{timestamp}.h5")
+    else:
+        model_path = os.path.join(LOCAL_REGISTRY_PATH, "models", "pv", f"{timestamp}.h5")
     model.save(model_path)
 
     print("✅ Model saved locally")
@@ -56,7 +65,10 @@ def save_model(model: keras.Model = None) -> None:
         model_filename = model_path.split("/")[-1] # e.g. "20230208-161047.h5" for instance
         client = storage.Client()
         bucket = client.bucket(BUCKET_NAME)
-        blob = bucket.blob(f"models/{model_filename}")
+        if forecast_features:
+            blob = bucket.blob(f"models/full/{model_filename}")
+        else:
+            blob = bucket.blob(f"models/pv/{model_filename}")
         blob.upload_from_filename(model_path)
 
         print("✅ Model saved to GCS")
@@ -66,7 +78,7 @@ def save_model(model: keras.Model = None) -> None:
     return None
 
 
-def load_model(stage="Production") -> keras.Model:
+def load_model(stage="Production", forecast_features: bool = False) -> keras.Model:
     """
     Return a saved model:
     - locally (latest one in alphabetical order)
@@ -81,11 +93,16 @@ def load_model(stage="Production") -> keras.Model:
         print(Fore.BLUE + f"\nLoad latest model from local registry..." + Style.RESET_ALL)
 
         # Get the latest model version name by the timestamp on disk
-        local_model_directory = os.path.join(LOCAL_REGISTRY_PATH, "models")
+        if forecast_features:
+            local_model_directory = os.path.join(LOCAL_REGISTRY_PATH, "models", "full")
+        else:
+            local_model_directory = os.path.join(LOCAL_REGISTRY_PATH, "models", "pv")
+
         local_model_paths = glob.glob(f"{local_model_directory}/*")
 
         if not local_model_paths:
             return None
+
 
         most_recent_model_path_on_disk = sorted(local_model_paths)[-1]
 

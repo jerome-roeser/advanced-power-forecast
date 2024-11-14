@@ -12,10 +12,9 @@ from power.params import *
 from power.ml_ops.data import get_data_with_cache, load_data_to_bq, clean_pv_data, clean_forecast_data
 from power.ml_ops.model import initialize_model, compile_model, train_model, evaluate_model
 from power.ml_ops.registry import load_model, save_model, save_results
-from power.ml_ops.cross_val import get_X_y_seq
+from power.ml_ops.cross_val import get_X_y_seq, get_X_y_seq_pv
 
-def preprocess(min_date = '1980-01-01 00:00:00',
-               max_date = '2022-12-31 23:00:00') -> None:
+def preprocess() -> None:
     """
     - Query the raw dataset from Le Wagon's BigQuery dataset
     - Cache query result as a local CSV if it doesn't exist locally
@@ -87,12 +86,13 @@ def preprocess(min_date = '1980-01-01 00:00:00',
 
 
 def train(
-        min_date = '2017-10-07 00:00:00',
-        max_date = '2019-12-31 23:00:00',
+        min_date: str = '2017-10-07 00:00:00',
+        max_date: str = '2019-12-31 23:00:00',
         split_ratio: float = 0.02, # 0.02 represents ~ 1 month of validation data on a 2009-2015 train set
-        learning_rate=0.02,
-        batch_size = 32,
-        patience = 5
+        learning_rate: float =0.02,
+        batch_size: int = 32,
+        patience: int = 5,
+        forecast_features: bool = False
     ) -> float:
 
     """
@@ -121,23 +121,6 @@ def train(
         cache_path=data_processed_pv_cache_path,
         data_has_header=True
     )
-
-    # --Second-- Load processed Weather Forecast data in chronological order
-    query_forecast = f"""
-        SELECT *
-        FROM {GCP_PROJECT}.{BQ_DATASET}.processed_weather_forecast
-        ORDER BY forecast_dt_unixtime, slice_dt_unixtime
-    """
-
-    data_processed_forecast_cache_path = Path(LOCAL_DATA_PATH).joinpath("processed", f"processed_weather_forecast.csv")
-    data_processed_forecast = get_data_with_cache(
-        gcp_project=GCP_PROJECT,
-        query=query_forecast,
-        cache_path=data_processed_forecast_cache_path,
-        data_has_header=True
-    )
-
-
     # the processed PV data from bq needs to be converted to datetime object
     data_processed_pv.utc_time = pd.to_datetime(data_processed_pv.utc_time,utc=True)
 
@@ -145,53 +128,113 @@ def train(
         print("❌ Not enough processed data retrieved to train on")
         return None
 
-    # Split the data into training and testing sets
-    train_pv = data_processed_pv[(data_processed_pv['utc_time'] > min_date) \
+
+    if forecast_features:
+    # --Second-- Load processed Weather Forecast data in chronological order
+        query_forecast = f"""
+            SELECT *
+            FROM {GCP_PROJECT}.{BQ_DATASET}.processed_weather_forecast
+            ORDER BY forecast_dt_unixtime, slice_dt_unixtime
+        """
+
+        data_processed_forecast_cache_path = Path(LOCAL_DATA_PATH).joinpath("processed", f"processed_weather_forecast.csv")
+        data_processed_forecast = get_data_with_cache(
+            gcp_project=GCP_PROJECT,
+            query=query_forecast,
+            cache_path=data_processed_forecast_cache_path,
+            data_has_header=True
+        )
+
+
+
+        if data_processed_forecast.shape[0] < 240:
+            print("❌ Not enough processed data retrieved to train on")
+            return None
+
+        # Split the data into training and testing sets
+
+        train_pv = data_processed_pv[(data_processed_pv['utc_time'] > min_date) \
                                  & (data_processed_pv['utc_time'] < max_date)]
+        train_forecast = data_processed_forecast
 
-    if data_processed_forecast.shape[0] < 240:
-        print("❌ Not enough processed data retrieved to train on")
-        return None
+        X_train, y_train = get_X_y_seq(train_pv,
+                                    train_forecast,
+                                    number_of_sequences=10_000,
+                                    input_length=48,
+                                    output_length=24,
+                                    gap_hours=12)
 
-    # Split the data into training and testing sets
-    train_forecast = data_processed_forecast
+        # Train model using `model.py`
+        model = load_model(forecast_features=True)
 
-    X_train, y_train = get_X_y_seq(train_pv,
-                                   train_forecast,
-                                   number_of_sequences=10_000,
-                                   input_length=48,
-                                   output_length=24,
-                                   gap_hours=12)
+        if model is None:
+            model = initialize_model(X_train, y_train, n_unit=24)
 
-
-    # Train model using `model.py`
-    model = load_model()
-
-    if model is None:
         model = initialize_model(X_train, y_train, n_unit=24)
 
-    model = compile_model(model, learning_rate=learning_rate)
-    model, history = train_model(model,
-                                X_train,
-                                y_train,
-                                validation_split = 0.3,
-                                batch_size = 32,
-                                epochs = 50
-                                )
+        model = compile_model(model, learning_rate=learning_rate)
+        model, history = train_model(model,
+                                    X_train,
+                                    y_train,
+                                    validation_split = 0.3,
+                                    batch_size = 32,
+                                    epochs = 50
+                                    )
+        val_mae = np.min(history.history['val_mae'])
 
-    val_mae = np.min(history.history['val_mae'])
+        params = dict(
+            context="train",
+            training_set_size=f'Training data from {min_date} to {max_date}',
+            row_count=len(X_train),
+        )
 
-    params = dict(
-        context="train",
-        training_set_size=f'Training data from {min_date} to {max_date}',
-        row_count=len(X_train),
-    )
+        # Save results on the hard drive using taxifare.ml_logic.registry
+        save_results(params=params, metrics=dict(mae=val_mae), history=history)
 
-    # Save results on the hard drive using taxifare.ml_logic.registry
-    save_results(params=params, metrics=dict(mae=val_mae))
+        # Save model weight on the hard drive (and optionally on GCS too!)
+        save_model(model=model, forecast_features= True)
 
-    # Save model weight on the hard drive (and optionally on GCS too!)
-    save_model(model=model)
+    else:
+
+        # Split the data into training and testing sets
+        train_pv = data_processed_pv[data_processed_pv['utc_time'] < max_date]
+
+        X_train, y_train = get_X_y_seq_pv(train_pv,
+                                    number_of_sequences=10_000,
+                                    input_length=48,
+                                    output_length=24,
+                                    gap_hours=12)
+
+        # Train model using `model.py`
+        model = load_model()
+
+        if model is None:
+            model = initialize_model(X_train, y_train, n_unit=24)
+
+        model = initialize_model(X_train, y_train, n_unit=24)
+
+        model = compile_model(model, learning_rate=learning_rate)
+        model, history = train_model(model,
+                                    X_train,
+                                    y_train,
+                                    validation_split = 0.3,
+                                    batch_size = 32,
+                                    epochs = 50
+                                    )
+
+        val_mae = np.min(history.history['val_mae'])
+
+        params = dict(
+            context="train",
+            training_set_size=f'Training data from {min_date} to {max_date}',
+            row_count=len(X_train),
+        )
+
+        # Save results on the hard drive using power.ml_logic.registry
+        save_results(params=params, metrics=dict(mae=val_mae), history=history)
+
+        # Save model weight on the hard drive (and optionally on GCS too!)
+        save_model(model=model)
 
     print("✅ train() done \n")
 
@@ -199,8 +242,8 @@ def train(
 
 
 def evaluate(
-        min_date = '1980-01-01 00:00:00',
-        max_date = '2019-12-31 23:00:00',
+        min_date: str = '2019-12-31 23:00:00',
+        forecast_features: bool = False,
         stage: str = "Production"
     ) -> float:
     """
@@ -209,8 +252,6 @@ def evaluate(
     """
     print(Fore.MAGENTA + "\n⭐️ Use case: evaluate" + Style.RESET_ALL)
 
-    model = load_model(stage=stage)
-    assert model is not None
 
 
     # Query your BigQuery processed table and get data_processed using `get_data_with_cache`
@@ -220,30 +261,71 @@ def evaluate(
         ORDER BY utc_time
     """
 
-    data_processed_cache_path = Path(LOCAL_DATA_PATH).joinpath("processed", f"processed_pv.csv")
-    data_processed = get_data_with_cache(
+    data_processed_pv_cache_path = Path(LOCAL_DATA_PATH).joinpath("processed", f"processed_pv.csv")
+    data_processed_pv = get_data_with_cache(
         gcp_project=GCP_PROJECT,
         query=query,
-        cache_path=data_processed_cache_path,
+        cache_path=data_processed_pv_cache_path,
         data_has_header=True
     )
 
-    if data_processed.shape[0] == 0:
+    # the processed PV data from bq needs to be converted to datetime object
+    data_processed_pv.utc_time = pd.to_datetime(data_processed_pv.utc_time,utc=True)
+
+    if data_processed_pv.shape[0] == 0:
         print("❌ No data to evaluate on")
         return None
 
-    test = data_processed[data_processed['utc_time'] >= max_date]
-    test = test[['electricity']]
+    if forecast_features:
+    # --Second-- Load processed Weather Forecast data in chronological order
+        query_forecast = f"""
+            SELECT *
+            FROM {GCP_PROJECT}.{BQ_DATASET}.processed_weather_forecast
+            ORDER BY forecast_dt_unixtime, slice_dt_unixtime
+        """
 
-    X_test, y_test = get_X_y_seq(test,
-                                   number_of_sequences=1_000,
-                                   input_length=48,
-                                   output_length=24,
-                                   gap_hours=12)
+        data_processed_forecast_cache_path = Path(LOCAL_DATA_PATH).joinpath("processed", f"processed_weather_forecast.csv")
+        data_processed_forecast = get_data_with_cache(
+            gcp_project=GCP_PROJECT,
+            query=query_forecast,
+            cache_path=data_processed_forecast_cache_path,
+            data_has_header=True
+        )
 
+        if data_processed_forecast.shape[0] < 240:
+            print("❌ Not enough processed data retrieved to train on")
+            return None
 
-    metrics_dict = evaluate_model(model=model, X=X_test, y=y_test)
-    mae = metrics_dict["mae"]
+        # Split the data into training and testing sets
+        test_pv = data_processed_pv[data_processed_pv['utc_time'] > min_date]
+        test_forecast = data_processed_forecast
+
+        X_test, y_test = get_X_y_seq(test_pv,
+                                    test_forecast,
+                                    number_of_sequences=1_000,
+                                    input_length=48,
+                                    output_length=24,
+                                    gap_hours=12)
+        model = load_model(forecast_features= True, stage=stage)
+        assert model is not None
+
+        metrics_dict = evaluate_model(model=model, X=X_test, y=y_test)
+        mae = metrics_dict["mae"]
+
+    else:
+        # Split the data into training and testing sets
+        test_pv = data_processed_pv[data_processed_pv['utc_time'] > min_date]
+        
+        X_test, y_test = get_X_y_seq_pv(test_pv,
+                                    number_of_sequences=1_000,
+                                    input_length=48,
+                                    output_length=24,
+                                    gap_hours=12)
+
+        model = load_model(stage=stage)
+        assert model is not None
+        metrics_dict = evaluate_model(model=model, X=X_test, y=y_test)
+        mae = metrics_dict["mae"]
 
     params = dict(
         context="evaluate", # Package behavior
@@ -257,14 +339,20 @@ def evaluate(
     return mae
 
 
-def pred(input_pred:str = '2013-05-08 12:00:00',
-         min_date = '2020-01-01 00:00:00',
-         max_date = '2022-12-29 23:00:00') -> pd.DataFrame:
+def pred(input_pred:str = '2022-07-06 12:00:00',
+         forecast_features: bool = False) -> pd.DataFrame:
     """
     Make a prediction using the latest trained model
     """
 
     print("\n⭐️ Use case: predict")
+
+    if forecast_features:
+        model = load_model(forecast_features= True)
+        assert model is not None
+    else:
+        model = load_model()
+        assert model is not None
 
     query = f"""
         SELECT *
@@ -272,16 +360,16 @@ def pred(input_pred:str = '2013-05-08 12:00:00',
         ORDER BY utc_time
     """
 
-    data_processed_cache_path = Path(LOCAL_DATA_PATH).joinpath("processed", f"processed_pv.csv")
-    data_processed = get_data_with_cache(
+    data_processed_pv_cache_path = Path(LOCAL_DATA_PATH).joinpath("processed", f"processed_pv.csv")
+    data_processed_pv = get_data_with_cache(
         gcp_project=GCP_PROJECT,
         query=query,
-        cache_path=data_processed_cache_path,
+        cache_path=data_processed_pv_cache_path,
         data_has_header=True
     )
 
     # X_pred should be the 48 hours before the input date
-    X_pred = data_processed[data_processed['utc_time'] < input_pred][-48:]
+    X_pred = data_processed_pv[data_processed_pv['utc_time'] < input_pred][-48:]
 
     # we have to rename columns because model is using 'power' as coulumns name
     # X_pred= X_pred.rename(columns={'electricity': 'power'})
@@ -291,13 +379,14 @@ def pred(input_pred:str = '2013-05-08 12:00:00',
     X_pred_tf = tf.convert_to_tensor(X_pred)
     X_pred_tf = tf.expand_dims(X_pred_tf, axis=0)
 
-    model = load_model()
-    assert model is not None
+
+
 
     y_pred = model.predict(X_pred_tf)
 
     # y_pred dates shoud be the 24hours after a 12 hour gap
-    y_pred_df = data_processed[data_processed['utc_time'] > input_pred][12:36]
+    y_pred_df = data_processed_pv[data_processed_pv['utc_time'] > input_pred][12:36]
+
     y_pred_df['pred'] = y_pred[0]
 
     # y_pred_df should have only two columns: 'utc_time', 'pred'; utc_time
@@ -326,9 +415,8 @@ def pred(input_pred:str = '2013-05-08 12:00:00',
 
 
 if __name__ == '__main__':
-    preprocess(min_date = '1980-01-01 00:00:00',
-               max_date = '2022-12-31 23:00:00')
+    preprocess()
     train(min_date = '2017-10-07 00:00:00',
           max_date = '2019-12-30 23:00:00')
-    evaluate()
+    evaluate(min_date='2019-12-30 23:00:00')
     pred('2013-05-08 12:00:00')
