@@ -76,6 +76,7 @@ reset_local_files:
 	mkdir power/.lewagon/mlops/training_outputs/models/pv
 	mkdir power/.lewagon/mlops/training_outputs/models/full
 	mkdir power/.lewagon/mlops/training_outputs/params
+	mkdir power/.lewagon/mlops/training_outputs/history
 
 reset_bq_files:
 	-bq rm --project_id ${GCP_PROJECT} ${BQ_DATASET}.processed_pv

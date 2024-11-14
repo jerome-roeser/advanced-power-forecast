@@ -9,7 +9,7 @@ from google.cloud import storage
 
 from power.params import *
 
-def save_results(params: dict, metrics: dict) -> None:
+def save_results(params: dict, metrics: dict, history: dict) -> None:
     """
     Persist params & metrics locally on the hard drive at
     "{LOCAL_REGISTRY_PATH}/params/{current_timestamp}.pickle"
@@ -30,6 +30,12 @@ def save_results(params: dict, metrics: dict) -> None:
         metrics_path = os.path.join(LOCAL_REGISTRY_PATH, "metrics", timestamp + ".pickle")
         with open(metrics_path, "wb") as file:
             pickle.dump(metrics, file)
+
+    # Save history locally
+    if history is not None:
+        history_path = os.path.join(LOCAL_REGISTRY_PATH, "history", timestamp + ".pickle")
+        with open(history_path, "wb") as file:
+            pickle.dump(history, file)
 
     print("✅ Results saved locally")
 
@@ -91,7 +97,7 @@ def load_model(stage="Production", forecast_features: bool = False) -> keras.Mod
             local_model_directory = os.path.join(LOCAL_REGISTRY_PATH, "models", "full")
         else:
             local_model_directory = os.path.join(LOCAL_REGISTRY_PATH, "models", "pv")
-            
+
         local_model_paths = glob.glob(f"{local_model_directory}/*")
 
         if not local_model_paths:
