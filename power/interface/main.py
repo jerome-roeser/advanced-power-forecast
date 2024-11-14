@@ -189,10 +189,10 @@ def train(
         )
 
         # Save results on the hard drive using taxifare.ml_logic.registry
-        save_results(params=params, metrics=dict(mae=val_mae))
+        save_results(params=params, metrics=dict(mae=val_mae), history=history)
 
         # Save model weight on the hard drive (and optionally on GCS too!)
-        save_model(model=model)
+        save_model(model=model, forecast_features= True)
 
     else:
 
@@ -261,20 +261,20 @@ def evaluate(
         ORDER BY utc_time
     """
 
-    data_processed_cache_path = Path(LOCAL_DATA_PATH).joinpath("processed", f"processed_pv.csv")
-    data_processed = get_data_with_cache(
+    data_processed_pv_cache_path = Path(LOCAL_DATA_PATH).joinpath("processed", f"processed_pv.csv")
+    data_processed_pv = get_data_with_cache(
         gcp_project=GCP_PROJECT,
         query=query,
-        cache_path=data_processed_cache_path,
+        cache_path=data_processed_pv_cache_path,
         data_has_header=True
     )
 
-    if data_processed.shape[0] == 0:
+    # the processed PV data from bq needs to be converted to datetime object
+    data_processed_pv.utc_time = pd.to_datetime(data_processed_pv.utc_time,utc=True)
+
+    if data_processed_pv.shape[0] == 0:
         print("❌ No data to evaluate on")
         return None
-
-    test_pv = data_processed[data_processed['utc_time'] >= min_date]
-    test_pv = test_pv[['electricity']]
 
     if forecast_features:
     # --Second-- Load processed Weather Forecast data in chronological order
@@ -297,11 +297,12 @@ def evaluate(
             return None
 
         # Split the data into training and testing sets
+        test_pv = data_processed_pv[data_processed_pv['utc_time'] > min_date]
         test_forecast = data_processed_forecast
 
         X_test, y_test = get_X_y_seq(test_pv,
                                     test_forecast,
-                                    number_of_sequences=10_000,
+                                    number_of_sequences=1_000,
                                     input_length=48,
                                     output_length=24,
                                     gap_hours=12)
@@ -312,7 +313,10 @@ def evaluate(
         mae = metrics_dict["mae"]
 
     else:
-        X_test, y_test = get_X_y_seq(test_pv,
+        # Split the data into training and testing sets
+        test_pv = data_processed_pv[data_processed_pv['utc_time'] > min_date]
+        
+        X_test, y_test = get_X_y_seq_pv(test_pv,
                                     number_of_sequences=1_000,
                                     input_length=48,
                                     output_length=24,
@@ -335,7 +339,7 @@ def evaluate(
     return mae
 
 
-def pred(input_pred:str = '2013-05-08 12:00:00',
+def pred(input_pred:str = '2022-07-06 12:00:00',
          forecast_features: bool = False) -> pd.DataFrame:
     """
     Make a prediction using the latest trained model

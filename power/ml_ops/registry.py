@@ -9,7 +9,7 @@ from google.cloud import storage
 
 from power.params import *
 
-def save_results(params: dict, metrics: dict, history: dict) -> None:
+def save_results(params: dict, metrics: dict, history: dict = None) -> None:
     """
     Persist params & metrics locally on the hard drive at
     "{LOCAL_REGISTRY_PATH}/params/{current_timestamp}.pickle"
@@ -33,7 +33,7 @@ def save_results(params: dict, metrics: dict, history: dict) -> None:
 
     # Save history locally
     if history is not None:
-        history_path = os.path.join(LOCAL_REGISTRY_PATH, "history", timestamp + ".pickle")
+        history_path = os.path.join(LOCAL_REGISTRY_PATH, "histories", timestamp + ".pickle")
         with open(history_path, "wb") as file:
             pickle.dump(history, file)
 
