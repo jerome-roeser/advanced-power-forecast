@@ -9,7 +9,7 @@ from typing import Dict, List, Tuple, Sequence
 from datetime import datetime
 
 from power.params import *
-from power.ml_ops.data import get_data_with_cache, load_data_to_bq, clean_pv_data, clean_forecast_data
+from power.ml_ops.data import get_data_with_cache, load_data_to_bq, clean_pv_data, clean_forecast_data, get_weather_forecast_features
 from power.ml_ops.model import initialize_model, compile_model, train_model, evaluate_model
 from power.ml_ops.registry import load_model, save_model, save_results
 from power.ml_ops.cross_val import get_X_y_seq, get_X_y_seq_pv
@@ -41,8 +41,20 @@ def preprocess() -> None:
         data_has_header=True
     )
 
-    # Process data
+    # Clean data
     data_pv_clean = clean_pv_data(data_pv_query)
+
+    # Process time features
+    local_time = pd.to_datetime(data_pv_clean.pop('local_time'), utc= True)
+    timestamp_s = local_time.map(pd.Timestamp.timestamp)
+
+    day = 24*60*60
+    year = (365.2425)*day
+
+    data_pv_clean['day_sin'] = np.sin(timestamp_s * (2 * np.pi / day))
+    data_pv_clean['day_cos'] = np.cos(timestamp_s * (2 * np.pi / day))
+    data_pv_clean['year_sin'] = np.sin(timestamp_s * (2 * np.pi / year))
+    data_pv_clean['year_cos'] = np.cos(timestamp_s * (2 * np.pi / year))
 
 
     load_data_to_bq(
@@ -70,8 +82,30 @@ def preprocess() -> None:
         data_has_header=True
     )
 
-    # Process data
+    # Clean data
     data_forecast_clean = clean_forecast_data(data_forecast_query)
+
+    # Process time features
+    date_time = pd.to_datetime(data_forecast_clean['utc_time'])
+    timestamp_s = date_time.map(pd.Timestamp.timestamp)
+
+    day = 24*60*60
+    year = (365.2425)*day
+
+    data_forecast_clean['forecast_day_sin'] = np.sin(timestamp_s * (2 * np.pi / day))
+    data_forecast_clean['forecast_day_cos'] = np.cos(timestamp_s * (2 * np.pi / day))
+    data_forecast_clean['forecast_year_sin'] = np.sin(timestamp_s * (2 * np.pi / year))
+    data_forecast_clean['forecast_year_cos'] = np.cos(timestamp_s * (2 * np.pi / year))
+
+    # Process wind fratures
+    wind_speed = data_forecast_clean.pop('wind_speed')
+
+    # Convert to radians.
+    wind_rad = data_forecast_clean.pop('wind_deg')*np.pi / 180
+
+    # Calculate the wind x and y components.
+    data_forecast_clean['Wx'] = wind_speed*np.cos(wind_rad)
+    data_forecast_clean['Wy'] = wind_speed*np.sin(wind_rad)
 
 
     load_data_to_bq(
@@ -86,8 +120,10 @@ def preprocess() -> None:
 
 
 def train(
-        min_date: str = '2017-10-07 00:00:00',
+        min_date_pv: str = '1980-01-01 00:00:00',
+        min_date_forecast: str = '2017-10-07 00:00:00',
         max_date: str = '2019-12-31 23:00:00',
+        sequences: int = 10_000,
         split_ratio: float = 0.02, # 0.02 represents ~ 1 month of validation data on a 2009-2015 train set
         learning_rate: float =0.02,
         batch_size: int = 32,
@@ -134,7 +170,7 @@ def train(
         query_forecast = f"""
             SELECT *
             FROM {GCP_PROJECT}.{BQ_DATASET}.processed_weather_forecast
-            ORDER BY forecast_dt_unixtime, slice_dt_unixtime
+            ORDER BY utc_time, prediction_utc_time
         """
 
         data_processed_forecast_cache_path = Path(LOCAL_DATA_PATH).joinpath("processed", f"processed_weather_forecast.csv")
@@ -153,16 +189,21 @@ def train(
 
         # Split the data into training and testing sets
 
-        train_pv = data_processed_pv[(data_processed_pv['utc_time'] > min_date) \
+        train_pv = data_processed_pv[(data_processed_pv['utc_time'] > min_date_forecast) \
                                  & (data_processed_pv['utc_time'] < max_date)]
-        train_forecast = data_processed_forecast
+        train_forecast = data_processed_forecast[data_processed_forecast < max_date]
 
+        print(Fore.BLUE + "\nMaking sequences with weather forecast features for training the model..." + Style.RESET_ALL)
         X_train, y_train = get_X_y_seq(train_pv,
                                     train_forecast,
-                                    number_of_sequences=10_000,
+                                    number_of_sequences=sequences,
                                     input_length=48,
                                     output_length=24,
                                     gap_hours=12)
+
+        sequence_cache_path = Path(LOCAL_DATA_PATH).joinpath("sequences")
+        np.save(file= sequence_cache_path.joinpath('X_train_full'), arr= X_train)
+        np.save(file= sequence_cache_path.joinpath('y_train_full'), arr= y_train)
 
         # Train model using `model.py`
         model = load_model(forecast_features=True)
@@ -184,7 +225,7 @@ def train(
 
         params = dict(
             context="train",
-            training_set_size=f'Training data from {min_date} to {max_date}',
+            training_set_size=f'Training data from {min_date_forecast} to {max_date}',
             row_count=len(X_train),
         )
 
@@ -199,11 +240,17 @@ def train(
         # Split the data into training and testing sets
         train_pv = data_processed_pv[data_processed_pv['utc_time'] < max_date]
 
+        print(Fore.BLUE + "\nMaking sequences with historical PV power data for training the model..." + Style.RESET_ALL)
         X_train, y_train = get_X_y_seq_pv(train_pv,
-                                    number_of_sequences=10_000,
+                                    number_of_sequences=sequences,
                                     input_length=48,
                                     output_length=24,
                                     gap_hours=12)
+
+
+        sequence_cache_path = Path(LOCAL_DATA_PATH).joinpath("sequences")
+        np.save(file= sequence_cache_path.joinpath('X_train'), arr= X_train)
+        np.save(file= sequence_cache_path.joinpath('y_train'), arr= y_train)
 
         # Train model using `model.py`
         model = load_model()
@@ -226,7 +273,7 @@ def train(
 
         params = dict(
             context="train",
-            training_set_size=f'Training data from {min_date} to {max_date}',
+            training_set_size=f'Training data from {min_date_pv} to {max_date}',
             row_count=len(X_train),
         )
 
@@ -242,7 +289,10 @@ def train(
 
 
 def evaluate(
-        min_date: str = '2019-12-31 23:00:00',
+        min_date_pv: str = '2019-12-31 23:00:00',
+        min_date_forecast: str = '2019-12-31 23:00:00',
+        max_date: str = '2022-12-31 23:00:00',
+        sequences: int = 1_000,
         forecast_features: bool = False,
         stage: str = "Production"
     ) -> float:
@@ -281,7 +331,7 @@ def evaluate(
         query_forecast = f"""
             SELECT *
             FROM {GCP_PROJECT}.{BQ_DATASET}.processed_weather_forecast
-            ORDER BY forecast_dt_unixtime, slice_dt_unixtime
+            ORDER BY utc_time, predicition_utc_time
         """
 
         data_processed_forecast_cache_path = Path(LOCAL_DATA_PATH).joinpath("processed", f"processed_weather_forecast.csv")
@@ -297,12 +347,12 @@ def evaluate(
             return None
 
         # Split the data into training and testing sets
-        test_pv = data_processed_pv[data_processed_pv['utc_time'] > min_date]
-        test_forecast = data_processed_forecast
+        test_pv = data_processed_pv[data_processed_pv['utc_time'] > min_date_pv]
+        test_forecast = data_processed_forecast[data_processed_forecast['utc_time'] < max_date]
 
         X_test, y_test = get_X_y_seq(test_pv,
                                     test_forecast,
-                                    number_of_sequences=1_000,
+                                    number_of_sequences= sequences,
                                     input_length=48,
                                     output_length=24,
                                     gap_hours=12)
@@ -314,10 +364,10 @@ def evaluate(
 
     else:
         # Split the data into training and testing sets
-        test_pv = data_processed_pv[data_processed_pv['utc_time'] > min_date]
-        
+        test_pv = data_processed_pv[data_processed_pv['utc_time'] > min_date_pv]
+
         X_test, y_test = get_X_y_seq_pv(test_pv,
-                                    number_of_sequences=1_000,
+                                    number_of_sequences= sequences,
                                     input_length=48,
                                     output_length=24,
                                     gap_hours=12)
@@ -336,7 +386,7 @@ def evaluate(
 
     print("✅ evaluate() done \n")
 
-    return mae
+    return X_test, y_test, mae
 
 
 def pred(input_pred:str = '2022-07-06 12:00:00',
@@ -345,14 +395,7 @@ def pred(input_pred:str = '2022-07-06 12:00:00',
     Make a prediction using the latest trained model
     """
 
-    print("\n⭐️ Use case: predict")
-
-    if forecast_features:
-        model = load_model(forecast_features= True)
-        assert model is not None
-    else:
-        model = load_model()
-        assert model is not None
+    print(Fore.MAGENTA + "\n⭐️ Use case: predict" + Style.RESET_ALL)
 
     query = f"""
         SELECT *
@@ -369,19 +412,58 @@ def pred(input_pred:str = '2022-07-06 12:00:00',
     )
 
     # X_pred should be the 48 hours before the input date
-    X_pred = data_processed_pv[data_processed_pv['utc_time'] < input_pred][-48:]
+    X_pred_pv = data_processed_pv[data_processed_pv['utc_time'] < input_pred][-48:]
 
-    # we have to rename columns because model is using 'power' as coulumns name
-    # X_pred= X_pred.rename(columns={'electricity': 'power'})
+    if forecast_features:
+    # --Second-- Load processed Weather Forecast data in chronological order
+        query_forecast = f"""
+            SELECT *
+            FROM {GCP_PROJECT}.{BQ_DATASET}.processed_weather_forecast
+            ORDER BY utc_time, predicition_utc_time
+        """
 
-    # convert X_pred to a tensorflow object
-    X_pred = X_pred[['electricity']].to_numpy()
-    X_pred_tf = tf.convert_to_tensor(X_pred)
-    X_pred_tf = tf.expand_dims(X_pred_tf, axis=0)
+        data_processed_forecast_cache_path = Path(LOCAL_DATA_PATH).joinpath("processed", f"processed_weather_forecast.csv")
+        data_processed_forecast = get_data_with_cache(
+            gcp_project=GCP_PROJECT,
+            query=query_forecast,
+            cache_path=data_processed_forecast_cache_path,
+            data_has_header=True
+        )
+
+        if data_processed_forecast.shape[0] < 240:
+            print("❌ Not enough processed data retrieved to train on")
+            return None
+
+        input_date = input_pred.split()[0]
+        X_pred_forecast = get_weather_forecast_features(data_processed_forecast, input_date)
+
+        X_pred_pv = X_pred_pv.reset_index()
+        to_concat = [X_pred_pv.iloc[:, 2:], X_pred_forecast.iloc[:, 2:]]
+
+        X_pred = pd.concat(to_concat, axis=1)
+        feature_indices = {name:i for i, name in enumerate(X_pred)}
+        X_pred = X_pred.to_numpy()
+        X_pred_tf = tf.convert_to_tensor(X_pred)
+        X_pred_tf = tf.expand_dims(X_pred_tf, axis=0)
+
+        model = load_model(forecast_features= True)
+        assert model is not None
+
+    else:
+        # convert X_pred to a tensorflow object
+        X_pred = X_pred_pv.iloc[:, 1:]
+        feature_indices = {name:i for i, name in enumerate(X_pred)}
+        X_pred = X_pred.to_numpy()
+        X_pred_tf = tf.convert_to_tensor(X_pred)
+        X_pred_tf = tf.expand_dims(X_pred_tf, axis=0)
+
+        model = load_model()
+        assert model is not None
 
 
 
-
+    print(Fore.BLUE + f"\nPredict with {feature_indices} X_pred tensors \
+        \n -> forecast features: {forecast_features}" + Style.RESET_ALL)
     y_pred = model.predict(X_pred_tf)
 
     # y_pred dates shoud be the 24hours after a 12 hour gap
@@ -391,9 +473,8 @@ def pred(input_pred:str = '2022-07-06 12:00:00',
 
     # y_pred_df should have only two columns: 'utc_time', 'pred'; utc_time
     # should be datetime object
-    # # please improve code above!
-    y_pred_df = y_pred_df.drop(columns='local_time')
-    y_pred_df = y_pred_df.drop(columns='electricity')
+
+    y_pred_df = y_pred_df[['utc_time', 'pred']]
     y_pred_df.reset_index(drop=True, inplace=True)
     y_pred_df.utc_time = pd.to_datetime(y_pred_df.utc_time,utc=True)
 
@@ -407,7 +488,6 @@ def pred(input_pred:str = '2022-07-06 12:00:00',
 
     y_pred_df.pred = y_pred_df.pred.apply(cutoff_func)
 
-    print(y_pred_df.pred)
 
     print("\n✅ prediction done: ", y_pred, y_pred.shape, "\n")
 
@@ -416,7 +496,6 @@ def pred(input_pred:str = '2022-07-06 12:00:00',
 
 if __name__ == '__main__':
     preprocess()
-    train(min_date = '2017-10-07 00:00:00',
-          max_date = '2019-12-30 23:00:00')
-    evaluate(min_date='2019-12-30 23:00:00')
-    pred('2013-05-08 12:00:00')
+    train()
+    evaluate()
+    pred()

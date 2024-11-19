@@ -49,31 +49,37 @@ def clean_forecast_data(forecast_df: pd.DataFrame) -> pd.DataFrame:
                      last day of PV data
     """
     df = compress(forecast_df)
+    df = df.drop(columns=['lat', 'lon',
+                          'forecast_dt_unixtime',
+                          'slice_dt_unixtime'])
 
+    df.rename(columns={'forecast_dt_iso':'utc_time',
+                        'slice_dt_iso':'prediction_utc_time'},
+                        inplace=True)
 
     # get only 1 forecast per day and deal with uncommon UTC format
-    df['forecast_dt_iso'] = df['forecast_dt_iso'].str.replace('+0000 UTC', '')
-    df['slice_dt_iso'] = df['slice_dt_iso'].str.replace('+0000 UTC', '')
+    df['utc_time'] = df['utc_time'].str.replace('+0000 UTC', '')
+    df['prediction_utc_time'] = df['prediction_utc_time'].str.replace('+0000 UTC', '')
 
-    df = df[df['forecast_dt_iso'].str.contains('12:00:00')]
+    df = df[df['utc_time'].str.contains('12:00:00')]
 
-    df['forecast_dt_iso'] = pd.to_datetime(df['forecast_dt_iso'])
-    df['slice_dt_iso'] = pd.to_datetime(df['slice_dt_iso'])
+    df['utc_time'] = pd.to_datetime(df['utc_time'])
+    df['prediction_utc_time'] = pd.to_datetime(df['prediction_utc_time'])
 
-    df_unique_dates = df['forecast_dt_iso'].unique()
+    df_unique_dates = df['utc_time'].unique()
 
     # reduce to 48h of weather forecast (from 00:00 to 23:00 each day)
     df_revised = []
     for date in df_unique_dates:
-        data = df[(df['forecast_dt_iso'] == date) & \
-            (df['slice_dt_iso'].between(date + dt.timedelta(days=1) - dt.timedelta(hours=12),
+        data = df[(df['utc_time'] == date) & \
+            (df['prediction_utc_time'].between(date + dt.timedelta(days=1) - dt.timedelta(hours=12),
                                         date + dt.timedelta(days=2) + dt.timedelta(hours=11)))]
         df_revised.append(data)
 
     df_revised_ordered = pd.concat(df_revised, ignore_index=True)
 
     # hard code the end date to match wiht PV data
-    processed_df = df_revised_ordered[df_revised_ordered['slice_dt_iso'] <= '2022-12-31 23:00:00']
+    processed_df = df_revised_ordered[df_revised_ordered['prediction_utc_time'] <= '2022-12-31 23:00:00']
 
     return processed_df
 
@@ -210,9 +216,7 @@ def get_weather_forecast_features(forecast: pd.DataFrame, input_date: str) -> pd
             -> second 24 rows: hourly (from 00:00 to 23:00) weather forecast
                of input_date +1 forecast on input_date (at 12:00)
     """
-    forecast.rename(columns={'forecast_dt_iso':'utc_time',
-                        'slice_dt_iso':'prediction_utc_time'},
-                        inplace=True)
+
     forecast['utc_time'] = pd.to_datetime(forecast['utc_time'])
     forecast['prediction_utc_time'] = pd.to_datetime(forecast['prediction_utc_time'])
 
