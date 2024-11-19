@@ -70,6 +70,7 @@ reset_local_files:
 	mkdir -p power/.lewagon/mlops/data/
 	mkdir power/.lewagon/mlops/data/raw
 	mkdir power/.lewagon/mlops/data/processed
+	mkdir power/.lewagon/mlops/data/sequences
 	mkdir power/.lewagon/mlops/training_outputs
 	mkdir power/.lewagon/mlops/training_outputs/metrics
 	mkdir power/.lewagon/mlops/training_outputs/models
