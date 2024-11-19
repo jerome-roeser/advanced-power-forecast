@@ -7,6 +7,7 @@ import pandas as pd
 pd.set_option("display.max_columns", None)
 
 # Manipulating temporal data and check the types of variables
+from tqdm import tqdm
 from typing import Dict, List, Tuple, Sequence
 from power.ml_ops.data import get_weather_forecast_features
 from power.ml_ops.model import mean_historical_power
@@ -119,19 +120,15 @@ def get_Xi_yi(
     target_start = input_end + gap_hours
     target_end = target_start + output_length
 
-    # first we parse the electricity feature
-    # need to reset index only for X_i in order to be able to concat with X_weather later on
+    # first we parse the PV features
     X_i = pv_fold.iloc[input_start:input_end].reset_index()
-    y_i = pv_fold.iloc[target_start:target_end][[TARGET]]    # creates a pd.DataFrame for the target y
+    y_i = pv_fold.iloc[target_start:target_end][[TARGET]]   # creates a pd.DataFrame for the target y
 
     # then we parse/create the weather forecast features
     X_weather = get_weather_forecast_features(forecast_fold, forecast_date)
 
-    # features = ['utc_time', 'prediction_utc_time','temperature', 'clouds', 'wind_speed']
-    # to_concat = [X_i[['utc_time','electricity']], X_weather[features]]
-
-    features = ['temperature', 'clouds', 'accumulated','wind_speed']
-    to_concat = [X_i[['electricity']], X_weather[features]]
+    # Finally concatenate PV and Weather Forecast features
+    to_concat = [X_i.iloc[:, 2:], X_weather.iloc[:, 2:]]
     X_i = pd.concat(to_concat, axis=1)
     return (X_i, y_i)
 
@@ -149,7 +146,7 @@ def get_X_y_seq(
 
     X, y = [], []       # lists for the sequences for X and y
 
-    for i in range(number_of_sequences):
+    for i in tqdm(range(number_of_sequences)):
         (Xi, yi) = get_Xi_yi(pv_fold, forecast_fold, input_length, output_length, gap_hours)   # calls the previous function to generate sequences X + y
         X.append(Xi)
         y.append(yi)
@@ -180,8 +177,9 @@ def get_Xi_yi_pv(
     target_start = input_end + gap_hours
     target_end = target_start + output_length
 
-    X_i = fold.iloc[input_start:input_end][[TARGET]]
-    y_i = fold.iloc[target_start:target_end][[TARGET]]   # creates a pd.DataFrame for the target y
+    X_i = fold.iloc[input_start:input_end]
+    X_i = X_i.iloc[:,1:]
+    y_i = fold.iloc[target_start:target_end][[TARGET]]
 
     return (X_i, y_i)
 
@@ -198,7 +196,7 @@ def get_X_y_seq_pv(
 
     X, y = [], []    # lists for the sequences for X and y
 
-    for i in range(number_of_sequences):
+    for i in tqdm(range(number_of_sequences)):
         (Xi, yi) = get_Xi_yi_pv(fold, input_length, output_length, gap_hours)   # calls the previous function to generate sequences X + y
         X.append(Xi)
         y.append(yi)
