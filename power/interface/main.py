@@ -120,11 +120,11 @@ def preprocess() -> None:
 
 
 def train(
-        min_date_pv: str = '1980-01-01 00:00:00',
-        min_date_forecast: str = '2017-10-07 00:00:00',
-        max_date: str = '2019-12-31 23:00:00',
+        train_start_pv: str = '1980-01-01 00:00:00',
+        train_stop_pv: str = '2014-05-26 18:00:00',
+        train_start_forecast: str = '2017-10-07 00:00:00',
+        train_stop_forecast: str = '2021-12-13 18:00:00',
         sequences: int = 10_000,
-        split_ratio: float = 0.02, # 0.02 represents ~ 1 month of validation data on a 2009-2015 train set
         learning_rate: float =0.02,
         batch_size: int = 32,
         patience: int = 5,
@@ -189,9 +189,9 @@ def train(
 
         # Split the data into training and testing sets
 
-        train_pv = data_processed_pv[(data_processed_pv['utc_time'] > min_date_forecast) \
-                                 & (data_processed_pv['utc_time'] < max_date)]
-        train_forecast = data_processed_forecast[data_processed_forecast < max_date]
+        train_pv = data_processed_pv[(data_processed_pv['utc_time'] > train_start_forecast) \
+                                 & (data_processed_pv['utc_time'] < train_stop_forecast)]
+        train_forecast = data_processed_forecast[data_processed_forecast['utc_time'] < train_stop_forecast]
 
         print(Fore.BLUE + "\nMaking sequences with weather forecast features for training the model..." + Style.RESET_ALL)
         X_train, y_train = get_X_y_seq(train_pv,
@@ -225,7 +225,7 @@ def train(
 
         params = dict(
             context="train",
-            training_set_size=f'Training data from {min_date_forecast} to {max_date}',
+            training_set_size=f'Training data from {train_start_forecast} to {train_stop_forecast}',
             row_count=len(X_train),
         )
 
@@ -238,7 +238,7 @@ def train(
     else:
 
         # Split the data into training and testing sets
-        train_pv = data_processed_pv[data_processed_pv['utc_time'] < max_date]
+        train_pv = data_processed_pv[data_processed_pv['utc_time'] < train_stop_pv]
 
         print(Fore.BLUE + "\nMaking sequences with historical PV power data for training the model..." + Style.RESET_ALL)
         X_train, y_train = get_X_y_seq_pv(train_pv,
@@ -273,7 +273,7 @@ def train(
 
         params = dict(
             context="train",
-            training_set_size=f'Training data from {min_date_pv} to {max_date}',
+            training_set_size=f'Training data from {train_start_pv} to {train_stop_pv}',
             row_count=len(X_train),
         )
 
@@ -289,11 +289,12 @@ def train(
 
 
 def evaluate(
-        min_date_pv: str = '2019-12-31 23:00:00',
-        min_date_forecast: str = '2019-12-31 23:00:00',
-        max_date: str = '2022-12-31 23:00:00',
+        test_start_pv: str = '2014-05-26 19:00:00',
+        test_stop_pv: str = '2022-12-30 23:00:00',
+        test_start_forecast: str = '2021-12-13 18:00:00',
+        test_stop_forecast: str = '2022-12-30 23:00:00',
         sequences: int = 1_000,
-        forecast_features: bool = False,
+        forecast_features: bool = True,
         stage: str = "Production"
     ) -> float:
     """
@@ -347,8 +348,9 @@ def evaluate(
             return None
 
         # Split the data into training and testing sets
-        test_pv = data_processed_pv[data_processed_pv['utc_time'] > min_date_pv]
-        test_forecast = data_processed_forecast[data_processed_forecast['utc_time'] < max_date]
+        test_pv = data_processed_pv[(data_processed_pv['utc_time'] > test_start_forecast)\
+                    & (data_processed_pv['utc_time'] < test_stop_forecast)]
+        test_forecast = data_processed_forecast[data_processed_forecast['utc_time'] > test_start_forecast]
 
         X_test, y_test = get_X_y_seq(test_pv,
                                     test_forecast,
@@ -364,7 +366,7 @@ def evaluate(
 
     else:
         # Split the data into training and testing sets
-        test_pv = data_processed_pv[data_processed_pv['utc_time'] > min_date_pv]
+        test_pv = data_processed_pv[data_processed_pv['utc_time'] > test_start_pv]
 
         X_test, y_test = get_X_y_seq_pv(test_pv,
                                     number_of_sequences= sequences,
@@ -386,7 +388,7 @@ def evaluate(
 
     print("✅ evaluate() done \n")
 
-    return X_test, y_test, mae
+    return mae
 
 
 def pred(input_pred:str = '2022-07-06 12:00:00',
