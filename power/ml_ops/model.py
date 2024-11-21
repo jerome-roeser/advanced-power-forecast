@@ -13,20 +13,29 @@ from tensorflow.keras.callbacks import EarlyStopping
 # keras models
 # =============================================================================
 
+
 def initialize_model(X_train, y_train, n_unit=24):
+
 
     # 1 - RNN architecture
     # ======================
     output_length = y_train.shape[1]
 
+    normalizer = layers.Normalization() # Instantiate a "normalizer" layer
+    normalizer.adapt(X_train) # "Fit" it on the train set
+
     model = models.Sequential([
         ## 1.0 - Input Layer
         layers.Input(shape=(X_train.shape[1],X_train.shape[2])),
         ## 1.1 - Normalization Layer
-        layers.Normalization(),
+        normalizer,
         ## 1.2 - Recurrent Layer
-        layers.LSTM(units=n_unit, activation='tanh', return_sequences = False),
-        ## 1.3 - Predictive Dense Layers
+        layers.LSTM(units=24, activation='tanh', return_sequences = True),
+        layers.LSTM(units=24, activation='tanh', return_sequences = False),
+        ## 1.3 Dense Layer and Dropout
+        layers.Dense(units=16, activation='relu'),
+        layers.Dropout(0.5),
+        ## 1.4 - Predictive Dense Layers
         layers.Dense(output_length, activation='linear'),
         ])
 
@@ -95,98 +104,3 @@ def evaluate_model(model,
     print(f"✅ Model evaluated, MAE: {round(mae, 2)}")
 
     return metrics
-
-
-def init_baseline_yesterday():
-
-    ## architecture
-    model = models.Sequential()
-    model.add(layers.Lambda(lambda x: x[:,-25:-1,0,None]))  # all sequences, last day, 1 feature (pv_power)
-
-    ## Compile
-    adam = optimizers.Adam(learning_rate=0.02)
-    model.compile(loss='mse', optimizer=adam, metrics=["mae"])
-
-    return model
-
-
-def init_baseline_mean():
-
-    ## architecture
-    model = models.Sequential()
-
-    def mean_historical_power(X: pd.DataFrame, input_date: str):
-            """
-            takes a date as a string input
-            returns the mean power produced on that day.
-            Mean over the 40 years of training
-            should remove 24 data points
-            """
-            input_date_dt = datetime.datetime.strptime(input_date, '%Y-%m-%d') + datetime.timedelta(days=1)
-            #filter by month
-            df_month = X[X.utc_time.dt.month == input_date_dt.month]
-            #filter by day
-            df_day = df_month[df_month.utc_time.dt.day == input_date_dt.day].reset_index()
-            array = df_day['electricity'].groupby(df_day.utc_time.dt.hour).mean().to_numpy()
-            tensor = tf.convert_to_tensor(array)
-            tensor = tf.expand_dims(tensor, axis=0)
-            return tensor
-
-    model.add(layers.Lambda(mean_historical_power))
-    ## Compile
-    model.compile()
-
-    adam = optimizers.Adam(learning_rate=0.02)
-    model.compile(loss='mse', optimizer=adam, metrics=["mae"])
-
-    return model
-
-
-def init_baseline_keras():
-
-    model = models.Sequential()
-    # a layer to take the last value of the sequence and output it
-    model.add(layers.Lambda(lambda x: x[:,-25:-1,0,None]))    # all sequences, last day, 1 feature (pv_power)
-
-
-    adam = optimizers.Adam(learning_rate=0.02)
-    model.compile(loss='mse', optimizer=adam, metrics=["mae"])
-
-    return model
-
-
-
-# function models
-# =============================================================================
-
-def model_yesterday(X: pd.DataFrame, input_date: str) -> pd.DataFrame:
-    """
-    Returns a simple previous day model
-    Input:
-     - a clean DataFrame
-     - a date with format: "YEAR-MONTH-DAY HOUR:MIN:SECONDS"
-    Returns:
-     - A dataFrame with the power production from the previous day
-    """
-    input_timestamp = pd.Timestamp(input_date, tz='UTC')
-    idx = X[X.utc_time == input_timestamp].index[0]
-    if idx <= 24:
-        return X.iloc[0:idx,:]
-    return X.iloc[idx-24:idx,:]
-
-def mean_historical_power(X: pd.DataFrame, input_date: str):
-    """
-    takes a date as a string input
-    returns the mean power produced on that day.
-    Mean over the 40 years of training
-    should remove 24 data points
-    """
-    input_date_dt = datetime.datetime.strptime(input_date, '%Y-%m-%d') + datetime.timedelta(days=1)
-    #filter by month
-    df_month = X[X.utc_time.dt.month == input_date_dt.month]
-    #filter by day
-    df_day = df_month[df_month.utc_time.dt.day == input_date_dt.day].reset_index()
-    array = df_day['electricity'].groupby(df_day.utc_time.dt.hour).mean().to_numpy()
-    tensor = tf.convert_to_tensor(array)
-    tensor = tf.expand_dims(tensor, axis=0)
-    return array
